@@ -3,7 +3,7 @@ import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import path from "path";
-import { createServer as createViteServer } from "vite";
+
 import { GameState, Player } from "./src/types.ts";
 
 async function startServer() {
@@ -537,6 +537,7 @@ async function startServer() {
   });
 
   if (process.env.NODE_ENV !== "production") {
+    const { createServer as createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

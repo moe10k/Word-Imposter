@@ -1,0 +1,5 @@
+{
+  "name": "Word Imposter",
+  "description": "A turn-based social deduction game where players give hints to find the imposter among them.",
+  "requestFramePermissions": []
+}

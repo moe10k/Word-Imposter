@@ -521,15 +521,23 @@ async function startServer() {
           const player = room.players[playerIndex];
           player.isConnected = false;
 
+          if (room.phase === 'lobby') {
+            room.players.splice(playerIndex, 1);
+          }
+
+          const activePlayers = room.players.filter(p => p.isConnected);
+          if (activePlayers.length === 0) {
+            delete rooms[roomId];
+            return;
+          }
+
           if (player.isHost) {
             player.isHost = false;
-            const nextHost = room.players.find(p => p.isConnected);
-            if (nextHost) {
-              nextHost.isHost = true;
+            if (activePlayers.length > 0) {
+              activePlayers[0].isHost = true;
             }
           }
 
-          // If in lobby and disconnected, we could remove them, but for now just mark
           broadcastState(roomId);
         }
       });

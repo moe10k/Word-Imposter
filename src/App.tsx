@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Users, 
-  User, 
-  Sword, 
-  Shield, 
-  MessageSquare, 
-  Vote, 
-  Trophy, 
+import {
+  Users,
+  User,
+  Sword,
+  Shield,
+  MessageSquare,
+  Vote,
+  Trophy,
   AlertCircle,
   RefreshCw,
   Play,
@@ -44,11 +44,11 @@ export default function App() {
 
   const scrollToBottom = useCallback((force = false) => {
     if (!chatContainerRef.current) return;
-    
+
     const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
     // If we are within 20px of the bottom, we auto-scroll
     const isNearBottom = scrollHeight - scrollTop - clientHeight < 20;
-    
+
     if (force || isNearBottom) {
       chatContainerRef.current.scrollTo({
         top: scrollHeight,
@@ -112,22 +112,22 @@ export default function App() {
             },
           },
         });
-        
+
         const words = JSON.parse(response.text || "{}");
         if (words.secretWord && words.imposterWord) {
-          newSocket.emit('startGame', { 
-            roomId, 
-            secretWord: words.secretWord, 
-            imposterWord: words.imposterWord 
+          newSocket.emit('startGame', {
+            roomId,
+            secretWord: words.secretWord,
+            imposterWord: words.imposterWord
           });
         }
       } catch (error) {
         console.error("Failed to generate words:", error);
         // Fallback words
-        newSocket.emit('startGame', { 
-          roomId, 
-          secretWord: "Apple", 
-          imposterWord: "Pear" 
+        newSocket.emit('startGame', {
+          roomId,
+          secretWord: "Apple",
+          imposterWord: "Pear"
         });
       }
     });
@@ -213,7 +213,20 @@ export default function App() {
   };
 
   const copyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(window.location.href);
+    } else {
+      const textArea = document.createElement("textarea");
+      textArea.value = window.location.href;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+      } catch (err) {
+        console.error('Failed to copy', err);
+      }
+      document.body.removeChild(textArea);
+    }
     setCopySuccess(true);
     setTimeout(() => setCopySuccess(false), 2000);
   };
@@ -229,7 +242,7 @@ export default function App() {
           <MessageSquare className="w-4 h-4 text-indigo-500" />
           {isPlaying ? "Game Log & Hints" : "Lobby Chat"}
         </h3>
-        <div 
+        <div
           ref={chatContainerRef}
           className="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar min-h-0"
         >
@@ -255,7 +268,7 @@ export default function App() {
               }
 
               return (
-                <motion.div 
+                <motion.div
                   key={msg.id}
                   initial={{ x: isMe ? 20 : -20, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
@@ -264,11 +277,10 @@ export default function App() {
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-lg ${isMe ? 'bg-indigo-600' : 'bg-slate-800'}`}>
                     <User className={`w-5 h-5 ${isMe ? 'text-white' : 'text-slate-500'}`} />
                   </div>
-                  <div className={`group relative p-4 rounded-2xl max-w-[85%] shadow-lg ${
-                    isMe 
-                      ? 'bg-indigo-600 text-white rounded-tr-none' 
-                      : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700'
-                  }`}>
+                  <div className={`group relative p-4 rounded-2xl max-w-[85%] shadow-lg ${isMe
+                    ? 'bg-indigo-600 text-white rounded-tr-none'
+                    : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700'
+                    }`}>
                     <div className={`flex items-center gap-2 mb-1 ${isMe ? 'justify-end' : ''}`}>
                       <span className="text-[10px] font-black opacity-60 uppercase tracking-widest">{msg.playerName}</span>
                       <span className="text-[9px] opacity-40 font-bold">
@@ -287,7 +299,7 @@ export default function App() {
 
         {(!isPlaying || (isMyTurn && !isSpectator)) && (
           <div className="mt-8 flex gap-3">
-            <input 
+            <input
               type="text"
               value={userHint}
               onChange={(e) => setUserHint(e.target.value)}
@@ -295,7 +307,7 @@ export default function App() {
               placeholder={isPlaying ? "Enter a 1-word hint..." : "Type a message..."}
               className="flex-1 bg-slate-800 border-2 border-slate-700 rounded-2xl px-6 py-4 font-bold text-white focus:outline-none focus:border-indigo-600 transition-all text-base"
             />
-            <button 
+            <button
               onClick={() => {
                 if (isPlaying) submitHint();
                 else {
@@ -327,7 +339,7 @@ export default function App() {
             Cast Your Vote
           </h3>
           <div className="flex items-center gap-3 bg-slate-950 px-4 py-2 rounded-xl border border-slate-800">
-             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
               {votedCount} / {activeVoters.length} Voted
             </span>
           </div>
@@ -339,7 +351,7 @@ export default function App() {
               const hasVoted = !!gameState.lastVoteResults[socket?.id || ''];
               const isMe = p.id === socket?.id;
               const isVotedByMe = gameState.lastVoteResults[socket?.id || ''] === p.id;
-              
+
               return (
                 <motion.button
                   key={p.id}
@@ -347,16 +359,14 @@ export default function App() {
                   whileTap={!isSpectator && !hasVoted && !isMe && !p.isEliminated ? { scale: 0.98 } : {}}
                   onClick={() => submitVote(p.id)}
                   disabled={isSpectator || hasVoted || isMe || p.isEliminated}
-                  className={`group relative p-6 rounded-3xl border-2 transition-all flex items-center gap-4 text-left ${
-                    isMe || isSpectator || hasVoted || p.isEliminated
-                      ? `opacity-50 cursor-not-allowed ${isVotedByMe ? 'border-indigo-500 bg-indigo-500/5' : 'border-slate-800 bg-slate-900/50'}` 
-                      : 'border-slate-800 bg-slate-900 hover:border-indigo-500 hover:bg-indigo-500/5 shadow-xl'
-                  }`}
+                  className={`group relative p-6 rounded-3xl border-2 transition-all flex items-center gap-4 text-left ${isMe || isSpectator || hasVoted || p.isEliminated
+                    ? `opacity-50 cursor-not-allowed ${isVotedByMe ? 'border-indigo-500 bg-indigo-500/5' : 'border-slate-800 bg-slate-900/50'}`
+                    : 'border-slate-800 bg-slate-900 hover:border-indigo-500 hover:bg-indigo-500/5 shadow-xl'
+                    }`}
                 >
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all ${
-                    isVotedByMe ? 'bg-indigo-500 text-white' : 
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all ${isVotedByMe ? 'bg-indigo-500 text-white' :
                     isMe || p.isEliminated ? 'bg-slate-800 text-slate-600' : 'bg-slate-800 text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white'
-                  }`}>
+                    }`}>
                     <User className="w-6 h-6" />
                   </div>
 
@@ -382,7 +392,7 @@ export default function App() {
             })}
           </div>
         </div>
-        
+
         <div className="mt-6 pt-6 border-t border-slate-800">
           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">
             {isSpectator ? "Waiting for players to vote..." : (!!gameState.lastVoteResults[socket?.id || ''] ? "Vote cast! Waiting for others..." : "Select a player to vote for them as the imposter.")}
@@ -401,22 +411,21 @@ export default function App() {
         {gameState.players.map(p => {
           const isExpanded = expandedPlayerIds.includes(p.id);
           const isCurrentTurn = gameState.currentTurnPlayerId === p.id;
-          
+
           return (
             <div key={p.id} className="space-y-2">
-              <motion.div 
+              <motion.div
                 layout
-                onClick={() => setExpandedPlayerIds(prev => 
+                onClick={() => setExpandedPlayerIds(prev =>
                   isExpanded ? prev.filter(id => id !== p.id) : [...prev, p.id]
                 )}
-                animate={{ 
+                animate={{
                   scale: isCurrentTurn && isPlaying ? 1.02 : 1,
                   backgroundColor: isCurrentTurn && isPlaying ? 'rgba(99, 102, 241, 0.15)' : 'rgba(30, 41, 59, 0.5)'
                 }}
-                className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all cursor-pointer ${
-                  p.isEliminated ? 'opacity-40 grayscale border-transparent' : 
+                className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all cursor-pointer ${p.isEliminated ? 'opacity-40 grayscale border-transparent' :
                   isCurrentTurn && isPlaying ? 'border-indigo-600 shadow-lg shadow-indigo-500/10' : 'border-slate-800 hover:border-slate-700'
-                }`}
+                  }`}
               >
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${p.id === socket?.id ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-500'}`}>
                   <User className="w-5 h-5" />
@@ -452,7 +461,7 @@ export default function App() {
                   </motion.div>
                 </div>
               </motion.div>
-              
+
               <AnimatePresence>
                 {isExpanded && (
                   <motion.div
@@ -461,24 +470,24 @@ export default function App() {
                     exit={{ height: 0, opacity: 0 }}
                     className="overflow-hidden"
                   >
-                  <div className="bg-slate-800/30 rounded-2xl p-4 border border-slate-800/50 space-y-2">
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Hint History</span>
-                    {p.hints.length > 0 ? (
-                    <div className="flex flex-col gap-2">
-                        {p.hints.map((h, i) => (
-                          <div key={i} className="flex items-center justify-between bg-slate-800/80 px-3 py-2 rounded-xl text-xs border border-slate-700/50">
-                            <span className="text-slate-500 font-black uppercase text-[9px]">Round {i + 1}</span>
-                            <span className="text-slate-200 font-bold">{h}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-600 italic">No hints yet</span>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                    <div className="bg-slate-800/30 rounded-2xl p-4 border border-slate-800/50 space-y-2">
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Hint History</span>
+                      {p.hints.length > 0 ? (
+                        <div className="flex flex-col gap-2">
+                          {p.hints.map((h, i) => (
+                            <div key={i} className="flex items-center justify-between bg-slate-800/80 px-3 py-2 rounded-xl text-xs border border-slate-700/50">
+                              <span className="text-slate-500 font-black uppercase text-[9px]">Round {i + 1}</span>
+                              <span className="text-slate-200 font-bold">{h}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-600 italic">No hints yet</span>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           );
         })}
@@ -489,7 +498,7 @@ export default function App() {
   if (!isJoined) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 font-sans">
-        <motion.div 
+        <motion.div
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           className="bg-slate-900 p-12 rounded-[3rem] shadow-2xl shadow-black/50 max-w-md w-full text-center space-y-8 border border-slate-800"
@@ -503,7 +512,7 @@ export default function App() {
           </div>
           <div className="space-y-4">
             {joinError && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-2xl text-xs font-bold flex items-center gap-2"
@@ -512,7 +521,7 @@ export default function App() {
                 {joinError}
               </motion.div>
             )}
-            <input 
+            <input
               type="text"
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value)}
@@ -520,7 +529,7 @@ export default function App() {
               placeholder="Your Name"
               className="w-full bg-slate-800 border border-slate-700 rounded-xl px-6 py-4 font-bold text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-600 transition-all text-center text-lg shadow-inner"
             />
-            <button 
+            <button
               onClick={joinGame}
               className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-900/20"
             >
@@ -544,7 +553,7 @@ export default function App() {
   const renderTimer = () => {
     if (gameState.timer <= 0) return null;
     const percentage = (gameState.timer / gameState.maxTimer) * 100;
-    
+
     return (
       <div className="fixed top-24 left-1/2 -translate-x-1/2 w-full max-w-md px-6 z-40">
         <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-full p-2 shadow-2xl flex items-center gap-4">
@@ -552,7 +561,7 @@ export default function App() {
             <Clock className="w-5 h-5 text-white" />
           </div>
           <div className="flex-1 h-3 bg-slate-800 rounded-full overflow-hidden">
-            <motion.div 
+            <motion.div
               initial={{ width: '100%' }}
               animate={{ width: `${percentage}%` }}
               transition={{ duration: 1, ease: "linear" }}
@@ -599,7 +608,7 @@ export default function App() {
                 <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 break-all text-xs font-mono text-indigo-400">
                   {window.location.href}
                 </div>
-                <button 
+                <button
                   onClick={copyLink}
                   className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white py-4 rounded-xl font-bold transition-all border border-slate-700"
                 >
@@ -610,14 +619,13 @@ export default function App() {
             </div>
 
             {me?.isHost ? (
-              <button 
+              <button
                 onClick={requestStartGame}
                 disabled={gameState.players.filter(p => p.role === 'player').length < 3}
-                className={`w-full py-6 rounded-2xl font-black text-xl transition-all shadow-xl flex items-center justify-center gap-3 ${
-                  gameState.players.filter(p => p.role === 'player').length < 3
-                    ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700' 
-                    : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-900/20 active:scale-95'
-                }`}
+                className={`w-full py-6 rounded-2xl font-black text-xl transition-all shadow-xl flex items-center justify-center gap-3 ${gameState.players.filter(p => p.role === 'player').length < 3
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                  : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-900/20 active:scale-95'
+                  }`}
               >
                 <Play className="w-6 h-6" />
                 Start Game
@@ -628,7 +636,7 @@ export default function App() {
                 Waiting for Host...
               </div>
             )}
-            
+
             {me?.isHost && gameState.players.filter(p => p.role === 'player').length < 3 && (
               <p className="text-center text-slate-600 text-xs font-medium italic">
                 Need at least 3 players to start...
@@ -689,14 +697,14 @@ export default function App() {
                   Guess the secret word to win instantly. Use this wisely!
                 </p>
                 <div className="space-y-3">
-                  <input 
+                  <input
                     type="text"
                     value={imposterGuess}
                     onChange={(e) => setImposterGuess(e.target.value)}
                     placeholder="Guess the word..."
                     className="w-full bg-slate-800 border-2 border-red-500/20 rounded-2xl px-5 py-3 text-sm font-black text-white focus:outline-none focus:border-red-500"
                   />
-                  <button 
+                  <button
                     onClick={submitImposterGuess}
                     className="w-full bg-red-600 text-white py-4 rounded-2xl text-sm font-black hover:bg-red-700 transition-all shadow-lg shadow-red-900/20"
                   >
@@ -739,13 +747,13 @@ export default function App() {
 
   const renderGameOver = () => {
     const isWin = (gameState.winner === 'players' && me?.role === 'player') ||
-                (gameState.winner === 'imposter' && me?.role === 'imposter');
-    
+      (gameState.winner === 'imposter' && me?.role === 'imposter');
+
     const imposter = gameState.players.find(p => p.role === 'imposter')!;
 
     return (
       <div className="max-w-3xl mx-auto py-12 px-4 text-center space-y-16">
-        <motion.div 
+        <motion.div
           initial={{ scale: 0.5, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           className="space-y-8"
@@ -779,7 +787,7 @@ export default function App() {
         </div>
 
         {me?.isHost && (
-          <button 
+          <button
             onClick={resetGame}
             className="bg-indigo-600 text-white px-16 py-6 rounded-[2rem] font-black text-2xl hover:bg-indigo-700 transition-all shadow-2xl shadow-indigo-900/20 flex items-center gap-4 mx-auto"
           >
@@ -815,15 +823,14 @@ export default function App() {
                 </div>
               )}
               {gameState.phase !== 'lobby' && (
-                <div className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border ${
-                  me?.role === 'imposter' ? 'bg-red-500/10 text-red-500 border-red-500/20' : 
+                <div className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border ${me?.role === 'imposter' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
                   me?.role === 'spectator' ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-indigo-600 text-white border-indigo-500/20'
-                }`}>
+                  }`}>
                   {me?.isEliminated ? 'Eliminated' : me?.role}
                 </div>
               )}
               {me?.isHost && gameState.phase !== 'lobby' && (
-                <button 
+                <button
                   onClick={resetGame}
                   className="bg-slate-900 hover:bg-slate-800 text-slate-400 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-slate-800 flex items-center gap-2"
                 >
@@ -845,7 +852,7 @@ export default function App() {
       </main>
 
       <footer className="py-12 text-center text-slate-700 text-[10px] font-black uppercase tracking-[0.4em]">
-        <p>&copy; 2026 Word Imposter &bull; Online Multiplayer</p>
+        <p>&copy;  Shmini's Games &bull; Word Imposter</p>
       </footer>
     </div>
   );

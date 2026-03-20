@@ -3,8 +3,8 @@ import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import path from "path";
-
-import { GameState, Player } from "./src/types.ts";
+import { createServer as createViteServer } from "vite";
+import type { GameState, Player } from "./src/types.ts";
 
 async function startServer() {
   const app = express();
@@ -38,7 +38,7 @@ async function startServer() {
 
     room.players.forEach(player => {
       const filteredState = { ...room };
-      
+
       // Filter words based on phase and role
       if (room.phase === 'playing' || room.phase === 'voting') {
         if (player.role === 'imposter') {
@@ -88,7 +88,7 @@ async function startServer() {
 
     room.timer = seconds;
     room.maxTimer = seconds;
-    
+
     timers[roomId] = setInterval(() => {
       room.timer--;
       if (room.timer <= 0) {
@@ -108,7 +108,7 @@ async function startServer() {
     if (activePlayers.length === 0) return;
 
     // Filter turn order to only include active players
-    const activeTurnOrder = room.turnOrder.filter(id => 
+    const activeTurnOrder = room.turnOrder.filter(id =>
       activePlayers.some(p => p.id === id)
     );
 
@@ -116,7 +116,7 @@ async function startServer() {
 
     const currentIndex = activeTurnOrder.indexOf(room.currentTurnPlayerId || '');
     const nextIndex = (currentIndex + 1) % activeTurnOrder.length;
-    
+
     if (nextIndex === 0 && currentIndex !== -1) {
       // End of round, go to voting
       room.phase = 'voting';
@@ -244,7 +244,7 @@ async function startServer() {
         rooms[roomId] = getInitialState(roomId);
       }
       const room = rooms[roomId];
-      
+
       const existingPlayer = room.players.find(p => p.name === sanitizedName);
       if (existingPlayer && existingPlayer.isConnected) {
         socket.emit('joinError', 'Username already taken in this room.');
@@ -273,7 +273,7 @@ async function startServer() {
     socket.on('chatMessage', ({ roomId, text }) => {
       const room = rooms[roomId];
       if (!room) return;
-      
+
       // Input validation
       if (typeof text !== 'string' || !text.trim() || text.length > 200) return;
 
@@ -300,17 +300,17 @@ async function startServer() {
     socket.on('kickPlayer', ({ roomId, playerId }) => {
       const room = rooms[roomId];
       if (!room) return;
-      
+
       const requester = room.players.find(p => p.id === socket.id);
       if (!requester || !requester.isHost) return;
 
       const playerToKick = room.players.find(p => p.id === playerId);
       if (playerToKick) {
         room.players = room.players.filter(p => p.id !== playerId);
-        
+
         // Notify the kicked player
         io.to(playerId).emit('kicked');
-        
+
         // Disconnect the socket from the room
         const kickedSocket = io.sockets.sockets.get(playerId);
         if (kickedSocket) {
@@ -324,7 +324,7 @@ async function startServer() {
     socket.on('requestStartGame', ({ roomId }) => {
       const room = rooms[roomId];
       if (!room || room.phase !== 'lobby') return;
-      
+
       const player = room.players.find(p => p.id === socket.id);
       if (!player || !player.isHost) return;
 
@@ -334,7 +334,7 @@ async function startServer() {
       // Pick a random player to generate words
       const generator = activePlayers[Math.floor(Math.random() * activePlayers.length)];
       room.wordGeneratorId = generator.id;
-      
+
       io.to(generator.id).emit('requestWords');
     });
 
@@ -360,16 +360,16 @@ async function startServer() {
       room.phase = 'playing';
       room.round = 1;
       room.messages = []; // Clear messages for new game
-      
+
       const players = room.players.filter(p => p.role === 'player' && p.isConnected);
       // Shuffle players to ensure randomness in turn order and imposter selection
       const shuffledPlayers = [...players].sort(() => Math.random() - 0.5);
-      
+
       // Imposter cannot be the one who generated the words
       const potentialImposters = shuffledPlayers.filter(p => p.id !== room.wordGeneratorId);
       const imposterIndex = Math.floor(Math.random() * potentialImposters.length);
       const imposterId = potentialImposters[imposterIndex].id;
-      
+
       room.players.forEach(p => {
         if (p.role !== 'spectator') {
           const isImposter = p.id === imposterId;
@@ -390,7 +390,7 @@ async function startServer() {
         timestamp: Date.now(),
         isSystem: true
       });
-      
+
       room.currentTurnPlayerId = shuffledPlayers[0].id;
       startTimer(roomId, 45, () => {
         const currentPlayer = room.players.find(p => p.id === room.currentTurnPlayerId);
@@ -439,7 +439,7 @@ async function startServer() {
       if (!room || room.phase !== 'voting') return;
 
       room.lastVoteResults[socket.id] = votedId;
-      
+
       const activeVoters = room.players.filter(p => !p.isEliminated && p.role !== 'spectator');
       if (Object.keys(room.lastVoteResults).length === activeVoters.length) {
         clearInterval(timers[roomId]);
@@ -451,7 +451,7 @@ async function startServer() {
     socket.on('submitImposterGuess', ({ roomId, guess }) => {
       const room = rooms[roomId];
       if (!room || room.phase !== 'gameOver') return;
-      
+
       const player = room.players.find(p => p.id === socket.id);
       if (!player || player.role !== 'imposter') return;
 
@@ -469,7 +469,7 @@ async function startServer() {
     socket.on('imposterGuessResult', ({ roomId, isCorrect }) => {
       const room = rooms[roomId];
       if (!room) return;
-      
+
       if (timers[roomId]) clearInterval(timers[roomId]);
 
       if (isCorrect) {
@@ -485,12 +485,12 @@ async function startServer() {
     socket.on('resetGame', ({ roomId }) => {
       const room = rooms[roomId];
       if (!room) return;
-      
+
       const player = room.players.find(p => p.id === socket.id);
       if (!player || !player.isHost) return;
-      
+
       if (timers[roomId]) clearInterval(timers[roomId]);
-      
+
       room.phase = 'lobby';
       room.players.forEach(p => {
         p.isReady = false;
@@ -509,7 +509,7 @@ async function startServer() {
       room.turnOrder = [];
       room.timer = 0;
       room.maxTimer = 0;
-      
+
       broadcastState(roomId);
     });
 
@@ -520,7 +520,7 @@ async function startServer() {
         if (playerIndex !== -1) {
           const player = room.players[playerIndex];
           player.isConnected = false;
-          
+
           if (player.isHost) {
             player.isHost = false;
             const nextHost = room.players.find(p => p.isConnected);
@@ -537,7 +537,6 @@ async function startServer() {
   });
 
   if (process.env.NODE_ENV !== "production") {
-    const { createServer as createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

@@ -77,6 +77,7 @@ async function startServer() {
     lastVoteResults: {},
     timer: 0,
     maxTimer: 0,
+    imposterGuesses: 3,
   });
 
   const timers: Record<string, NodeJS.Timeout> = {};
@@ -128,9 +129,8 @@ async function startServer() {
         timestamp: Date.now(),
         isSystem: true
       });
-      startTimer(roomId, 30, () => {
-        resolveVoting(roomId);
-      });
+      room.timer = 0;
+      room.maxTimer = 0;
     } else {
       room.currentTurnPlayerId = activeTurnOrder[nextIndex];
       startTimer(roomId, 45, () => {
@@ -224,6 +224,7 @@ async function startServer() {
       room.lastVoteResults = {};
       room.eliminatedPlayerId = null;
       room.currentTurnPlayerId = null;
+      room.imposterGuesses = 3;
       nextTurn(roomId);
     }
     broadcastState(roomId);
@@ -279,12 +280,11 @@ async function startServer() {
 
       const player = room.players.find(p => p.id === socket.id);
       if (player) {
-        const sanitizedText = escapeHtml(text.trim());
         room.messages.push({
           id: Math.random().toString(36).substring(7),
           playerId: player.id,
           playerName: player.name,
-          text: sanitizedText,
+          text: text.trim(),
           timestamp: Date.now()
         });
 
@@ -360,6 +360,7 @@ async function startServer() {
       room.phase = 'playing';
       room.round = 1;
       room.messages = []; // Clear messages for new game
+      room.imposterGuesses = 3;
 
       const players = room.players.filter(p => p.role === 'player' && p.isConnected);
       // Shuffle players to ensure randomness in turn order and imposter selection
@@ -421,13 +422,12 @@ async function startServer() {
 
       const player = room.players.find(p => p.id === socket.id);
       if (player) {
-        const sanitizedHint = escapeHtml(hint.trim());
-        player.hints.push(sanitizedHint);
+        player.hints.push(hint.trim());
         room.messages.push({
           id: Math.random().toString(36).substring(7),
           playerId: player.id,
           playerName: player.name,
-          text: sanitizedHint,
+          text: hint.trim(),
           timestamp: Date.now()
         });
         nextTurn(roomId);
@@ -450,10 +450,13 @@ async function startServer() {
 
     socket.on('submitImposterGuess', ({ roomId, guess }) => {
       const room = rooms[roomId];
-      if (!room || room.phase !== 'gameOver') return;
+      if (!room || room.phase !== 'playing') return;
 
       const player = room.players.find(p => p.id === socket.id);
       if (!player || player.role !== 'imposter') return;
+      if (room.imposterGuesses <= 0) return;
+
+      room.imposterGuesses--;
 
       // Request validation from the host
       const host = room.players.find(p => p.isHost && p.isConnected);
@@ -470,14 +473,30 @@ async function startServer() {
       const room = rooms[roomId];
       if (!room) return;
 
-      if (timers[roomId]) clearInterval(timers[roomId]);
-
       if (isCorrect) {
+        if (timers[roomId]) clearInterval(timers[roomId]);
         room.phase = 'gameOver';
         room.winner = 'imposter';
       } else {
-        room.phase = 'gameOver';
-        room.winner = 'players';
+        if (room.imposterGuesses <= 0) {
+          room.messages.push({
+            id: Math.random().toString(36).substring(7),
+            playerId: 'system',
+            playerName: 'System',
+            text: 'The Imposter is out of guesses for this round!',
+            timestamp: Date.now(),
+            isSystem: true
+          });
+        } else {
+          room.messages.push({
+            id: Math.random().toString(36).substring(7),
+            playerId: 'system',
+            playerName: 'System',
+            text: 'The Imposter guessed incorrectly!',
+            timestamp: Date.now(),
+            isSystem: true
+          });
+        }
       }
       broadcastState(roomId);
     });
@@ -509,6 +528,7 @@ async function startServer() {
       room.turnOrder = [];
       room.timer = 0;
       room.maxTimer = 0;
+      room.imposterGuesses = 3;
 
       broadcastState(roomId);
     });

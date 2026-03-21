@@ -16,7 +16,8 @@ import {
   Link as LinkIcon,
   Copy,
   Clock,
-  ChevronDown
+  ChevronDown,
+  LogOut
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 import { GoogleGenAI, Type } from "@google/genai";
@@ -33,6 +34,7 @@ export default function App() {
   const [userHint, setUserHint] = useState('');
   const [imposterGuess, setImposterGuess] = useState('');
   const [copySuccess, setCopySuccess] = useState(false);
+  const [copyCodeSuccess, setCopyCodeSuccess] = useState(false);
   const [expandedPlayerIds, setExpandedPlayerIds] = useState<string[]>([]);
   const chatEndRef = React.useRef<HTMLDivElement>(null);
   const chatContainerRef = React.useRef<HTMLDivElement>(null);
@@ -63,16 +65,8 @@ export default function App() {
     }
   }, [messagesLength, scrollToBottom]);
 
-  // Get Room ID from URL or generate one
-  const roomId = useMemo(() => {
-    const params = new URLSearchParams(window.location.search);
-    let id = params.get('room');
-    if (!id) {
-      id = Math.random().toString(36).substring(2, 9);
-      window.history.replaceState({}, '', `?room=${id}`);
-    }
-    return id;
-  }, []);
+  const [inputRoomId, setInputRoomId] = useState(() => new URLSearchParams(window.location.search).get('room') || '');
+  const activeRoomIdRef = React.useRef(inputRoomId);
 
   useEffect(() => {
     const newSocket = io();
@@ -116,7 +110,7 @@ export default function App() {
         const words = JSON.parse(response.text || "{}");
         if (words.secretWord && words.imposterWord) {
           newSocket.emit('startGame', {
-            roomId,
+            roomId: activeRoomIdRef.current,
             secretWord: words.secretWord,
             imposterWord: words.imposterWord
           });
@@ -125,7 +119,7 @@ export default function App() {
         console.error("Failed to generate words:", error);
         // Fallback words
         newSocket.emit('startGame', {
-          roomId,
+          roomId: activeRoomIdRef.current,
           secretWord: "Apple",
           imposterWord: "Pear"
         });
@@ -150,10 +144,10 @@ export default function App() {
           }
         });
         const result = JSON.parse(response.text || "{}");
-        newSocket.emit('imposterGuessResult', { roomId, isCorrect: !!result.isCorrect });
+        newSocket.emit('imposterGuessResult', { roomId: activeRoomIdRef.current, isCorrect: !!result.isCorrect });
       } catch (error) {
         console.error("Failed to validate guess:", error);
-        newSocket.emit('imposterGuessResult', { roomId, isCorrect: false });
+        newSocket.emit('imposterGuessResult', { roomId: activeRoomIdRef.current, isCorrect: false });
       }
     });
 
@@ -171,45 +165,60 @@ export default function App() {
   }, [gameState?.phase]);
 
   const joinGame = () => {
+    if (!playerName.trim() || !socket || !inputRoomId.trim()) return;
+    setJoinError(null);
+    const id = inputRoomId.trim();
+    activeRoomIdRef.current = id;
+    window.history.replaceState({}, '', `?room=${id}`);
+    localStorage.setItem('playerName', playerName);
+    socket.emit('joinRoom', { roomId: id, playerName });
+    setIsJoined(true);
+  };
+
+  const createLobby = () => {
     if (!playerName.trim() || !socket) return;
     setJoinError(null);
+    const newId = Math.random().toString(36).substring(2, 9);
+    activeRoomIdRef.current = newId;
+    setInputRoomId(newId);
+    window.history.replaceState({}, '', `?room=${newId}`);
     localStorage.setItem('playerName', playerName);
-    socket.emit('joinRoom', { roomId, playerName });
+    socket.emit('joinRoom', { roomId: newId, playerName });
     setIsJoined(true);
   };
 
   const setReady = () => {
-    socket?.emit('setReady', { roomId });
+    socket?.emit('setReady', { roomId: activeRoomIdRef.current });
   };
 
   const requestStartGame = () => {
-    socket?.emit('requestStartGame', { roomId });
+    socket?.emit('requestStartGame', { roomId: activeRoomIdRef.current });
   };
 
   const submitHint = () => {
     if (!userHint.trim()) return;
-    socket?.emit('submitHint', { roomId, hint: userHint.trim().split(' ')[0] });
+    socket?.emit('submitHint', { roomId: activeRoomIdRef.current, hint: userHint.trim().split(' ')[0] });
     setUserHint('');
   };
 
   const submitVote = (votedId: string) => {
-    socket?.emit('submitVote', { roomId, votedId });
+    socket?.emit('submitVote', { roomId: activeRoomIdRef.current, votedId });
   };
 
   const submitImposterGuess = () => {
     if (!imposterGuess.trim()) return;
-    socket?.emit('submitImposterGuess', { roomId, guess: imposterGuess.trim() });
+    socket?.emit('submitImposterGuess', { roomId: activeRoomIdRef.current, guess: imposterGuess.trim() });
     setImposterGuess('');
   };
 
   const resetGame = () => {
     if (!me?.isHost) return;
-    socket?.emit('resetGame', { roomId });
+    socket?.emit('resetGame', { roomId: activeRoomIdRef.current });
   };
 
   const kickPlayer = (playerId: string) => {
     if (!me?.isHost) return;
-    socket?.emit('kickPlayer', { roomId, playerId });
+    socket?.emit('kickPlayer', { roomId: activeRoomIdRef.current, playerId });
   };
 
   const copyLink = () => {
@@ -229,6 +238,26 @@ export default function App() {
     }
     setCopySuccess(true);
     setTimeout(() => setCopySuccess(false), 2000);
+  };
+
+  const copyCode = () => {
+    if (!gameState) return;
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(gameState.roomId);
+    } else {
+      const textArea = document.createElement("textarea");
+      textArea.value = gameState.roomId;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+      } catch (err) {
+        console.error('Failed to copy', err);
+      }
+      document.body.removeChild(textArea);
+    }
+    setCopyCodeSuccess(true);
+    setTimeout(() => setCopyCodeSuccess(false), 2000);
   };
 
   const renderChatSection = (height = "600px") => {
@@ -303,7 +332,7 @@ export default function App() {
               type="text"
               value={userHint}
               onChange={(e) => setUserHint(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && (isPlaying ? submitHint() : socket?.emit('chatMessage', { roomId, text: userHint }))}
+              onKeyPress={(e) => e.key === 'Enter' && (isPlaying ? submitHint() : socket?.emit('chatMessage', { roomId: activeRoomIdRef.current, text: userHint }))}
               placeholder={isPlaying ? "Enter a 1-word hint..." : "Type a message..."}
               className="flex-1 bg-slate-800 border-2 border-slate-700 rounded-2xl px-6 py-4 font-bold text-white focus:outline-none focus:border-indigo-600 transition-all text-base"
             />
@@ -311,7 +340,7 @@ export default function App() {
               onClick={() => {
                 if (isPlaying) submitHint();
                 else {
-                  socket?.emit('chatMessage', { roomId, text: userHint });
+                  socket?.emit('chatMessage', { roomId: activeRoomIdRef.current, text: userHint });
                   setUserHint('');
                 }
               }}
@@ -508,7 +537,7 @@ export default function App() {
           </div>
           <div className="space-y-2">
             <h1 className="text-4xl font-black tracking-tighter text-white uppercase font-display">WORD IMPOSTER</h1>
-            <p className="text-slate-500 font-medium text-sm">Enter your name to join the lobby</p>
+            <p className="text-slate-500 font-medium text-sm">Join the game to start playing</p>
           </div>
           <div className="space-y-4">
             {joinError && (
@@ -525,16 +554,43 @@ export default function App() {
               type="text"
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && joinGame()}
               placeholder="Your Name"
               className="w-full bg-slate-800 border border-slate-700 rounded-xl px-6 py-4 font-bold text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-600 transition-all text-center text-lg shadow-inner"
             />
-            <button
-              onClick={joinGame}
-              className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-900/20"
-            >
-              Join Lobby
-            </button>
+            
+            <div className="h-px w-full bg-slate-800 my-4" />
+
+            <div className="flex flex-col gap-3">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={inputRoomId}
+                  onChange={(e) => setInputRoomId(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && joinGame()}
+                  placeholder="Room Code"
+                  className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 font-bold text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-600 transition-all text-center shadow-inner uppercase"
+                />
+                <button
+                  onClick={joinGame}
+                  className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-900/20 whitespace-nowrap"
+                >
+                  Join
+                </button>
+              </div>
+
+              <div className="flex items-center gap-4 my-2">
+                <div className="flex-1 h-px bg-slate-800" />
+                <span className="text-xs font-black text-slate-600 uppercase tracking-widest">OR</span>
+                <div className="flex-1 h-px bg-slate-800" />
+              </div>
+
+              <button
+                onClick={createLobby}
+                className="w-full bg-slate-800 border-2 border-slate-700 text-white py-4 rounded-xl font-bold text-lg hover:border-indigo-500 hover:bg-slate-800/80 transition-all shadow-lg"
+              >
+                Create New Lobby
+              </button>
+            </div>
           </div>
         </motion.div>
       </div>
@@ -605,8 +661,18 @@ export default function App() {
             <div className="bg-slate-900 rounded-[2rem] p-8 shadow-2xl border border-slate-800 space-y-6">
               <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em]">Invite Friends</h3>
               <div className="space-y-4">
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 break-all text-xs font-mono text-indigo-400">
-                  {window.location.href}
+                <div className="flex items-center justify-center gap-3 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                  <span className="text-sm font-black text-slate-500 uppercase tracking-[0.2em]">Room Code:</span>
+                  <span className="text-2xl font-black font-mono text-indigo-400 tracking-widest uppercase mt-0.5">
+                    {gameState.roomId}
+                  </span>
+                  <button
+                    onClick={copyCode}
+                    className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-indigo-400 hover:text-white transition-all shadow-sm flex items-center justify-center ml-2"
+                    title="Copy Room Code"
+                  >
+                    {copyCodeSuccess ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <Copy className="w-5 h-5" />}
+                  </button>
                 </div>
                 <button
                   onClick={copyLink}
@@ -642,6 +708,14 @@ export default function App() {
                 Need at least 3 players to start...
               </p>
             )}
+
+            <button
+              onClick={() => window.location.href = window.location.pathname}
+              className="w-full py-4 rounded-xl font-bold text-red-500 hover:text-white bg-slate-900 hover:bg-red-600 border border-slate-800 hover:border-red-500 transition-all shadow-lg flex items-center justify-center gap-2"
+            >
+              <LogOut className="w-5 h-5" />
+              Leave Lobby
+            </button>
           </div>
 
           <div className="lg:col-span-2">

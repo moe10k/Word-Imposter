@@ -5,6 +5,7 @@ import { Server } from "socket.io";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import type { GameState, Player } from "./src/types.ts";
+import { generateGameWords, checkImposterGuess } from "./src/services/openai.ts";
 
 async function startServer() {
   const app = express();
@@ -17,6 +18,27 @@ async function startServer() {
   });
 
   const PORT = Number(process.env.PORT) || 3000;
+  const EVENT_COOLDOWNS_MS = {
+    requestStartGame: Number(process.env.START_GAME_COOLDOWN_MS ?? 5000),
+    submitImposterGuess: Number(process.env.IMPOSTER_GUESS_COOLDOWN_MS ?? 3000)
+  } as const;
+  type RateLimitedEvent = keyof typeof EVENT_COOLDOWNS_MS;
+  const rateLimitTracker = new Map<string, Partial<Record<RateLimitedEvent, number>>>();
+
+  const checkRateLimit = (socketId: string, event: RateLimitedEvent) => {
+    const now = Date.now();
+    const cooldown = EVENT_COOLDOWNS_MS[event];
+    if (!cooldown) return 0;
+    const entry = rateLimitTracker.get(socketId) ?? {};
+    const lastCall = entry[event] ?? 0;
+    const elapsed = now - lastCall;
+    if (elapsed < cooldown) {
+      return cooldown - elapsed;
+    }
+    entry[event] = now;
+    rateLimitTracker.set(socketId, entry);
+    return 0;
+  };
 
   // Security: Simple HTML escape
   const escapeHtml = (unsafe: string) => {
@@ -321,21 +343,81 @@ async function startServer() {
       }
     });
 
-    socket.on('requestStartGame', ({ roomId }) => {
+    socket.on('requestStartGame', async ({ roomId }) => {
       const room = rooms[roomId];
       if (!room || room.phase !== 'lobby') return;
 
       const player = room.players.find(p => p.id === socket.id);
       if (!player || !player.isHost) return;
 
+      const retryIn = checkRateLimit(socket.id, 'requestStartGame');
+      if (retryIn > 0) {
+        socket.emit('rateLimited', { event: 'requestStartGame', retryInMs: retryIn });
+        return;
+      }
+
       const activePlayers = room.players.filter(p => p.isConnected && p.role === 'player');
       if (activePlayers.length < 3) return;
 
-      // Pick a random player to generate words
-      const generator = activePlayers[Math.floor(Math.random() * activePlayers.length)];
-      room.wordGeneratorId = generator.id;
+      try {
+        const { secretWord, imposterWord } = await generateGameWords();
 
-      io.to(generator.id).emit('requestWords');
+        room.secretWord = secretWord;
+        room.imposterWord = imposterWord;
+        room.phase = 'playing';
+        room.round = 1;
+        room.messages = []; // Clear messages for new game
+        room.imposterGuesses = 3;
+
+        const players = room.players.filter(p => p.role === 'player' && p.isConnected);
+        // Shuffle players to ensure randomness in turn order and imposter selection
+        const shuffledPlayers = [...players].sort(() => Math.random() - 0.5);
+
+        // Any player can be the imposter
+        const imposterIndex = Math.floor(Math.random() * shuffledPlayers.length);
+        const imposterId = shuffledPlayers[imposterIndex].id;
+
+        room.players.forEach(p => {
+          if (p.role !== 'spectator') {
+            const isImposter = p.id === imposterId;
+            p.role = isImposter ? 'imposter' : 'player';
+            p.isEliminated = false;
+            p.hints = [];
+            p.isReady = false;
+          }
+        });
+
+        room.turnOrder = shuffledPlayers.map(p => p.id);
+
+        room.messages.push({
+          id: Math.random().toString(36).substring(7),
+          playerId: 'system',
+          playerName: 'System',
+          text: 'Game started! Round 1 begins.',
+          timestamp: Date.now(),
+          isSystem: true
+        });
+
+        room.currentTurnPlayerId = shuffledPlayers[0].id;
+        startTimer(roomId, 45, () => {
+          const currentPlayer = room.players.find(p => p.id === room.currentTurnPlayerId);
+          if (currentPlayer) {
+            room.messages.push({
+              id: Math.random().toString(36).substring(7),
+              playerId: currentPlayer.id,
+              playerName: currentPlayer.name,
+              text: 'No Guess Made',
+              timestamp: Date.now(),
+              isWarning: true
+            });
+            currentPlayer.hints.push('No Guess Made');
+          }
+          nextTurn(roomId);
+        });
+        broadcastState(roomId);
+      } catch (error) {
+        console.error("Failed to start game:", error);
+      }
     });
 
     socket.on('setReady', ({ roomId }) => {
@@ -345,69 +427,6 @@ async function startServer() {
       if (player) {
         player.isReady = !player.isReady;
       }
-      broadcastState(roomId);
-    });
-
-    socket.on('startGame', ({ roomId, secretWord, imposterWord }) => {
-      const room = rooms[roomId];
-      if (!room || room.phase !== 'lobby') return;
-
-      // Only the chosen generator can start the game with words
-      if (socket.id !== room.wordGeneratorId) return;
-
-      room.secretWord = secretWord;
-      room.imposterWord = imposterWord;
-      room.phase = 'playing';
-      room.round = 1;
-      room.messages = []; // Clear messages for new game
-      room.imposterGuesses = 3;
-
-      const players = room.players.filter(p => p.role === 'player' && p.isConnected);
-      // Shuffle players to ensure randomness in turn order and imposter selection
-      const shuffledPlayers = [...players].sort(() => Math.random() - 0.5);
-
-      // Imposter cannot be the one who generated the words
-      const potentialImposters = shuffledPlayers.filter(p => p.id !== room.wordGeneratorId);
-      const imposterIndex = Math.floor(Math.random() * potentialImposters.length);
-      const imposterId = potentialImposters[imposterIndex].id;
-
-      room.players.forEach(p => {
-        if (p.role !== 'spectator') {
-          const isImposter = p.id === imposterId;
-          p.role = isImposter ? 'imposter' : 'player';
-          p.isEliminated = false;
-          p.hints = [];
-          p.isReady = false;
-        }
-      });
-
-      room.turnOrder = shuffledPlayers.map(p => p.id);
-
-      room.messages.push({
-        id: Math.random().toString(36).substring(7),
-        playerId: 'system',
-        playerName: 'System',
-        text: 'Game started! Round 1 begins.',
-        timestamp: Date.now(),
-        isSystem: true
-      });
-
-      room.currentTurnPlayerId = shuffledPlayers[0].id;
-      startTimer(roomId, 45, () => {
-        const currentPlayer = room.players.find(p => p.id === room.currentTurnPlayerId);
-        if (currentPlayer) {
-          room.messages.push({
-            id: Math.random().toString(36).substring(7),
-            playerId: currentPlayer.id,
-            playerName: currentPlayer.name,
-            text: 'No Guess Made',
-            timestamp: Date.now(),
-            isWarning: true
-          });
-          currentPlayer.hints.push('No Guess Made');
-        }
-        nextTurn(roomId);
-      });
       broadcastState(roomId);
     });
 
@@ -448,7 +467,7 @@ async function startServer() {
       broadcastState(roomId);
     });
 
-    socket.on('submitImposterGuess', ({ roomId, guess }) => {
+    socket.on('submitImposterGuess', async ({ roomId, guess }) => {
       const room = rooms[roomId];
       if (!room || room.phase !== 'playing') return;
 
@@ -456,49 +475,52 @@ async function startServer() {
       if (!player || player.role !== 'imposter') return;
       if (room.imposterGuesses <= 0) return;
 
+      if (typeof guess !== 'string') return;
+      const sanitizedGuess = guess.trim();
+      if (!sanitizedGuess || sanitizedGuess.length > 50) return;
+
+      const retryIn = checkRateLimit(socket.id, 'submitImposterGuess');
+      if (retryIn > 0) {
+        socket.emit('rateLimited', { event: 'submitImposterGuess', retryInMs: retryIn });
+        return;
+      }
+
       room.imposterGuesses--;
 
-      // Request validation from the host
-      const host = room.players.find(p => p.isHost && p.isConnected);
-      if (host) {
-        io.to(host.id).emit('validateImposterGuess', { guess, secretWord: room.secretWord });
-      } else {
-        // If no host, fallback to simple check (though this shouldn't happen)
-        const isCorrect = guess.trim().toLowerCase() === room.secretWord.toLowerCase();
-        socket.emit('imposterGuessResult', { roomId, isCorrect });
-      }
-    });
-
-    socket.on('imposterGuessResult', ({ roomId, isCorrect }) => {
-      const room = rooms[roomId];
-      if (!room) return;
-
-      if (isCorrect) {
-        if (timers[roomId]) clearInterval(timers[roomId]);
-        room.phase = 'gameOver';
-        room.winner = 'imposter';
-      } else {
-        if (room.imposterGuesses <= 0) {
-          room.messages.push({
-            id: Math.random().toString(36).substring(7),
-            playerId: 'system',
-            playerName: 'System',
-            text: 'The Imposter is out of guesses for this round!',
-            timestamp: Date.now(),
-            isSystem: true
-          });
+      try {
+        const isCorrect = sanitizedGuess.toLowerCase() === room.secretWord.toLowerCase()
+          ? true
+          : await checkImposterGuess(sanitizedGuess, room.secretWord);
+          
+        if (isCorrect) {
+          if (timers[roomId]) clearInterval(timers[roomId]);
+          room.phase = 'gameOver';
+          room.winner = 'imposter';
         } else {
-          room.messages.push({
-            id: Math.random().toString(36).substring(7),
-            playerId: 'system',
-            playerName: 'System',
-            text: 'The Imposter guessed incorrectly!',
-            timestamp: Date.now(),
-            isSystem: true
-          });
+          if (room.imposterGuesses <= 0) {
+            room.messages.push({
+              id: Math.random().toString(36).substring(7),
+              playerId: 'system',
+              playerName: 'System',
+              text: 'The Imposter is out of guesses for this round!',
+              timestamp: Date.now(),
+              isSystem: true
+            });
+          } else {
+            room.messages.push({
+              id: Math.random().toString(36).substring(7),
+              playerId: 'system',
+              playerName: 'System',
+              text: 'The Imposter guessed incorrectly!',
+              timestamp: Date.now(),
+              isSystem: true
+            });
+          }
         }
+        broadcastState(roomId);
+      } catch (error) {
+        console.error("Failed to check imposter guess:", error);
       }
-      broadcastState(roomId);
     });
 
     socket.on('resetGame', ({ roomId }) => {
@@ -534,6 +556,7 @@ async function startServer() {
     });
 
     socket.on('disconnect', () => {
+      rateLimitTracker.delete(socket.id);
       // Find room and player
       Object.entries(rooms).forEach(([roomId, room]) => {
         const playerIndex = room.players.findIndex(p => p.id === socket.id);

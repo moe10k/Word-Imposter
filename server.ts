@@ -5,7 +5,7 @@ import { Server } from "socket.io";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import type { GameState, Player } from "./src/types.ts";
-import { generateGameWords, checkImposterGuess } from "./src/services/openai.ts";
+import { generateGameWords } from "./src/services/openai.ts";
 
 async function startServer() {
   const app = express();
@@ -487,40 +487,34 @@ async function startServer() {
 
       room.imposterGuesses--;
 
-      try {
-        const isCorrect = sanitizedGuess.toLowerCase() === room.secretWord.toLowerCase()
-          ? true
-          : await checkImposterGuess(sanitizedGuess, room.secretWord);
-          
-        if (isCorrect) {
-          if (timers[roomId]) clearInterval(timers[roomId]);
-          room.phase = 'gameOver';
-          room.winner = 'imposter';
+      const isCorrect = sanitizedGuess.toLowerCase() === room.secretWord.toLowerCase();
+
+      if (isCorrect) {
+        if (timers[roomId]) clearInterval(timers[roomId]);
+        room.phase = 'gameOver';
+        room.winner = 'imposter';
+      } else {
+        if (room.imposterGuesses <= 0) {
+          room.messages.push({
+            id: Math.random().toString(36).substring(7),
+            playerId: 'system',
+            playerName: 'System',
+            text: 'The Imposter is out of guesses for this round!',
+            timestamp: Date.now(),
+            isSystem: true
+          });
         } else {
-          if (room.imposterGuesses <= 0) {
-            room.messages.push({
-              id: Math.random().toString(36).substring(7),
-              playerId: 'system',
-              playerName: 'System',
-              text: 'The Imposter is out of guesses for this round!',
-              timestamp: Date.now(),
-              isSystem: true
-            });
-          } else {
-            room.messages.push({
-              id: Math.random().toString(36).substring(7),
-              playerId: 'system',
-              playerName: 'System',
-              text: 'The Imposter guessed incorrectly!',
-              timestamp: Date.now(),
-              isSystem: true
-            });
-          }
+          room.messages.push({
+            id: Math.random().toString(36).substring(7),
+            playerId: 'system',
+            playerName: 'System',
+            text: 'The Imposter guessed incorrectly!',
+            timestamp: Date.now(),
+            isSystem: true
+          });
         }
-        broadcastState(roomId);
-      } catch (error) {
-        console.error("Failed to check imposter guess:", error);
       }
+      broadcastState(roomId);
     });
 
     socket.on('resetGame', ({ roomId }) => {

@@ -37,4 +37,5 @@ export interface GameState {
   lastVoteResults: Record<string, string>; // voterId -> votedId
   timer: number;
   maxTimer: number;
+  imposterGuesses: number;
 }

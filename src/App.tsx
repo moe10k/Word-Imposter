@@ -127,6 +127,12 @@ export default function App() {
     });
 
     newSocket.on('validateImposterGuess', async ({ guess, secretWord }) => {
+      // Basic check first to avoid API call if it's exactly the same
+      if (guess.trim().toLowerCase() === secretWord.toLowerCase()) {
+        newSocket.emit('imposterGuessResult', { roomId: activeRoomIdRef.current, isCorrect: true });
+        return;
+      }
+      
       // Only the host should reach here, and they'll have the secretWord sent by the server for this check
       try {
         const response = await ai.models.generateContent({
@@ -332,7 +338,16 @@ export default function App() {
               type="text"
               value={userHint}
               onChange={(e) => setUserHint(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && (isPlaying ? submitHint() : socket?.emit('chatMessage', { roomId: activeRoomIdRef.current, text: userHint }))}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  if (isPlaying) {
+                    submitHint();
+                  } else {
+                    socket?.emit('chatMessage', { roomId: activeRoomIdRef.current, text: userHint });
+                    setUserHint('');
+                  }
+                }
+              }}
               placeholder={isPlaying ? "Enter a 1-word hint..." : "Type a message..."}
               className="flex-1 bg-slate-800 border-2 border-slate-700 rounded-2xl px-6 py-4 font-bold text-white focus:outline-none focus:border-indigo-600 transition-all text-base"
             />
@@ -482,6 +497,15 @@ export default function App() {
                     </div>
                   )}
                   {p.isEliminated && <XCircle className="w-5 h-5 text-red-500" />}
+                  {me?.isHost && p.id !== socket?.id && !isPlaying && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); kickPlayer(p.id); }}
+                      className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-transparent hover:border-red-500/30"
+                      title="Kick Player"
+                    >
+                      <LogOut className="w-4 h-4" />
+                    </button>
+                  )}
                   <motion.div
                     animate={{ rotate: isExpanded ? 180 : 0 }}
                     className="text-slate-500"
@@ -771,12 +795,16 @@ export default function App() {
                   Guess the secret word to win instantly. Use this wisely!
                 </p>
                 <div className="space-y-3">
+                  <div className="flex justify-between items-center px-1">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Guesses left</span>
+                    <span className="text-[10px] text-red-400 font-black">{gameState.imposterGuesses} / 3</span>
+                  </div>
                   <input
                     type="text"
                     value={imposterGuess}
-                    onChange={(e) => setImposterGuess(e.target.value)}
+                    onChange={(e) => setImposterGuess(e.target.value.toUpperCase())}
                     placeholder="Guess the word..."
-                    className="w-full bg-slate-800 border-2 border-red-500/20 rounded-2xl px-5 py-3 text-sm font-black text-white focus:outline-none focus:border-red-500"
+                    className="w-full bg-slate-800 border-2 border-red-500/20 rounded-2xl px-5 py-3 text-sm font-black text-white focus:outline-none focus:border-red-500 uppercase"
                   />
                   <button
                     onClick={submitImposterGuess}

@@ -20,10 +20,7 @@ import {
   LogOut
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
-import { GoogleGenAI, Type } from "@google/genai";
 import { Player, GameState } from './types';
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
 export default function App() {
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -87,74 +84,6 @@ export default function App() {
       setGameState(null);
       setJoinError('You have been kicked from the lobby.');
       window.history.replaceState({}, '', window.location.pathname);
-    });
-
-    newSocket.on('requestWords', async () => {
-      try {
-        const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
-          contents: "Generate a pair of related but distinct words for a game of 'Word Imposter'. One is the 'Secret Word' for normal players, and the other is the 'Imposter Word' for the imposter. They should be in the same category (e.g., 'Apple' and 'Pear'). Return as JSON.",
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                secretWord: { type: Type.STRING },
-                imposterWord: { type: Type.STRING },
-              },
-              required: ["secretWord", "imposterWord"],
-            },
-          },
-        });
-
-        const words = JSON.parse(response.text || "{}");
-        if (words.secretWord && words.imposterWord) {
-          newSocket.emit('startGame', {
-            roomId: activeRoomIdRef.current,
-            secretWord: words.secretWord,
-            imposterWord: words.imposterWord
-          });
-        }
-      } catch (error) {
-        console.error("Failed to generate words:", error);
-        // Fallback words
-        newSocket.emit('startGame', {
-          roomId: activeRoomIdRef.current,
-          secretWord: "Apple",
-          imposterWord: "Pear"
-        });
-      }
-    });
-
-    newSocket.on('validateImposterGuess', async ({ guess, secretWord }) => {
-      // Basic check first to avoid API call if it's exactly the same
-      if (guess.trim().toLowerCase() === secretWord.toLowerCase()) {
-        newSocket.emit('imposterGuessResult', { roomId: activeRoomIdRef.current, isCorrect: true });
-        return;
-      }
-      
-      // Only the host should reach here, and they'll have the secretWord sent by the server for this check
-      try {
-        const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
-          contents: `Is the word "${guess.toLowerCase()}" semantically the same as or a very close synonym of "${secretWord.toLowerCase()}" in the context of a guessing game? Answer with a JSON object containing a boolean field "isCorrect".`,
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                isCorrect: { type: Type.BOOLEAN }
-              },
-              required: ["isCorrect"]
-            }
-          }
-        });
-        const result = JSON.parse(response.text || "{}");
-        newSocket.emit('imposterGuessResult', { roomId: activeRoomIdRef.current, isCorrect: !!result.isCorrect });
-      } catch (error) {
-        console.error("Failed to validate guess:", error);
-        newSocket.emit('imposterGuessResult', { roomId: activeRoomIdRef.current, isCorrect: false });
-      }
     });
 
     return () => {

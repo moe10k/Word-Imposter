@@ -17,7 +17,8 @@ import {
   Copy,
   Clock,
   ChevronDown,
-  LogOut
+  LogOut,
+  Crown
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 import { Player, GameState } from './types';
@@ -384,6 +385,17 @@ export default function App() {
         {gameState.players.map(p => {
           const isExpanded = expandedPlayerIds.includes(p.id);
           const isCurrentTurn = gameState.currentTurnPlayerId === p.id;
+          const highlightCard = isCurrentTurn && !p.isEliminated && isPlaying;
+          const cardStateClasses = p.isEliminated
+            ? 'opacity-40 grayscale border-transparent p-4'
+            : highlightCard
+              ? 'p-5 lg:p-6 border-amber-400/80 shadow-[0_20px_45px_rgba(251,191,36,0.25)] ring-1 ring-amber-200/60'
+              : 'p-4 border-slate-800 hover:border-slate-700';
+          const animatedBackground = p.isEliminated
+            ? 'rgba(15, 23, 42, 0.35)'
+            : highlightCard
+              ? 'rgba(251, 191, 36, 0.12)'
+              : 'rgba(30, 41, 59, 0.5)';
 
           return (
             <div key={p.id} className="space-y-2">
@@ -393,12 +405,12 @@ export default function App() {
                   isExpanded ? prev.filter(id => id !== p.id) : [...prev, p.id]
                 )}
                 animate={{
-                  scale: isCurrentTurn && isPlaying ? 1.02 : 1,
-                  backgroundColor: isCurrentTurn && isPlaying ? 'rgba(99, 102, 241, 0.15)' : 'rgba(30, 41, 59, 0.5)'
+                  scale: highlightCard ? 1.06 : 1,
+                  backgroundColor: animatedBackground,
+                  boxShadow: highlightCard ? '0px 15px 35px rgba(251, 191, 36, 0.25)' : '0px 0px 0px rgba(0,0,0,0)'
                 }}
-                className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all cursor-pointer ${p.isEliminated ? 'opacity-40 grayscale border-transparent' :
-                  isCurrentTurn && isPlaying ? 'border-indigo-600 shadow-lg shadow-indigo-500/10' : 'border-slate-800 hover:border-slate-700'
-                  }`}
+                transition={highlightCard ? { duration: 1.4, repeat: Infinity, repeatType: 'reverse' } : { duration: 0.2 }}
+                className={`flex items-center gap-4 rounded-2xl border-2 transition-all cursor-pointer ${cardStateClasses}`}
               >
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${p.id === socket?.id ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-500'}`}>
                   <User className="w-5 h-5" />
@@ -414,12 +426,16 @@ export default function App() {
                   {(p.isHost || (isCurrentTurn && !p.isEliminated && isPlaying)) && (
                     <div className="flex items-center gap-2 bg-slate-950/60 px-2 py-1 rounded-xl border border-slate-800/50">
                       {p.isHost && (
-                        <span className="text-[9px] bg-indigo-600/20 text-indigo-400 px-2 py-0.5 rounded-md uppercase tracking-widest font-black border border-indigo-500/20">
-                          Host
+                        <span
+                          className="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500/20 text-amber-300 border border-amber-400/40"
+                          title="Lobby Host"
+                        >
+                          <Crown className="w-3.5 h-3.5" />
                         </span>
                       )}
                       {isCurrentTurn && !p.isEliminated && isPlaying && (
-                        <span className={`font-black text-[11px] tabular-nums ${gameState.timer < 5 ? 'text-red-500 animate-pulse' : 'text-indigo-400'}`}>
+                        <span className={`flex items-center gap-1 font-black text-[12px] tabular-nums ${gameState.timer < 5 ? 'text-red-400 animate-pulse' : 'text-amber-300'}`}>
+                          <Clock className="w-3.5 h-3.5" />
                           {gameState.timer}s
                         </span>
                       )}
@@ -691,9 +707,15 @@ export default function App() {
             <span className="text-xs font-black text-slate-500 uppercase tracking-[0.2em]">
               {isVoting ? "VOTING PHASE" : `Round ${gameState.round}`}
             </span>
-            <h2 className="text-3xl font-black text-white flex items-center gap-3 justify-center sm:justify-start">
-              {isVoting ? "Who is the Imposter?" : (isMyTurn ? "Your Turn" : `${currentPlayer?.name}'s Turn`)}
-              {!isVoting && isMyTurn && <div className="w-3 h-3 bg-indigo-500 rounded-full shadow-[0_0_10px_rgba(99,102,241,0.5)]" />}
+            <h2 className="text-3xl font-black text-white flex flex-wrap items-center gap-4 justify-center sm:justify-start">
+              <span>{isVoting ? "Who is the Imposter?" : (isMyTurn ? "Your Turn" : `${currentPlayer?.name}'s Turn`)}</span>
+              {!isVoting && (
+                <span className={`flex items-center gap-2 text-2xl font-black ${gameState.timer < 5 ? 'text-red-400 animate-pulse' : 'text-amber-300'}`}>
+                  <Clock className="w-5 h-5" />
+                  {gameState.timer}s
+                </span>
+              )}
+              {!isVoting && isMyTurn && <div className="w-3 h-3 bg-amber-400 rounded-full shadow-[0_0_12px_rgba(251,191,36,0.9)]" />}
             </h2>
           </div>
           <div className="bg-slate-950/50 p-4 px-8 rounded-3xl border border-slate-800 flex flex-col items-center sm:items-end gap-1">

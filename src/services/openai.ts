@@ -12,7 +12,6 @@ const defaultModel = process.env.OPENAI_MODEL?.trim() || "gpt-4.1-nano";
 const wordMaxTokens = Number(process.env.OPENAI_WORD_MAX_TOKENS ?? 48);
 const hintMaxTokens = Number(process.env.OPENAI_HINT_MAX_TOKENS ?? 8);
 const voteMaxTokens = Number(process.env.OPENAI_VOTE_MAX_TOKENS ?? 8);
-const guessMaxTokens = Number(process.env.OPENAI_GUESS_MAX_TOKENS ?? 8);
 
 const FALLBACK_WORDS: Array<{ secretWord: string; imposterWord: string }> = [
   { secretWord: "Apple", imposterWord: "Pear" },
@@ -146,30 +145,4 @@ export async function getAIVote(
     votedName.toLowerCase().includes(p.name.toLowerCase())
   );
   return votedPlayer?.id || activePlayers[Math.floor(Math.random() * activePlayers.length)].id;
-}
-
-export async function checkImposterGuess(guess: string, secretWord: string) {
-  if (!guess.trim()) return false;
-
-  if (guess.trim().toLowerCase() === secretWord.trim().toLowerCase()) {
-    return true;
-  }
-
-  try {
-    const response = await createResponse(
-      {
-        model: defaultModel,
-        input: `Secret word "${secretWord}". Guess "${guess}". Respond JSON {"correct": true|false} if the guess is the same word or a close synonym.`,
-        max_output_tokens: guessMaxTokens,
-      },
-      "checkImposterGuess"
-    );
-
-    const text = extractText(response);
-    if (!text) throw new Error("OpenAI returned an empty response for the guess check.");
-    return parseJson<{ correct: boolean }>(text, "imposter guess check").correct;
-  } catch (error) {
-    console.error("OpenAI checkImposterGuess failed; defaulting to simple match.", error);
-    return guess.trim().toLowerCase() === secretWord.trim().toLowerCase();
-  }
 }

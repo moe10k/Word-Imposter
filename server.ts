@@ -142,7 +142,12 @@ async function startServer() {
 
     if (nextIndex === 0 && currentIndex !== -1) {
       // End of round, go to voting
+      if (timers[roomId]) {
+        clearInterval(timers[roomId]);
+        delete timers[roomId];
+      }
       room.phase = 'voting';
+      room.currentTurnPlayerId = null;
       room.messages.push({
         id: Math.random().toString(36).substring(7),
         playerId: 'system',

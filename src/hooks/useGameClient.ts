@@ -1,20 +1,61 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import type { GameState } from '../types';
+import type { AuthUser, GameState } from '../types';
 import { getPlayerById, isCurrentTurn } from '../utils/gameSelectors';
 import {
   clearRoomQuery,
   createRoomId,
   getInitialRoomId,
-  getStoredPlayerName,
   setRoomQuery,
-  storePlayerName,
 } from '../utils/roomSession';
 
+type LoginPayload = {
+  identifier: string;
+  password: string;
+};
+
+type SignupPayload = {
+  username: string;
+  email: string;
+  password: string;
+};
+
+type AuthResponse = {
+  user: AuthUser | null;
+  error?: string;
+};
+
+async function requestAuth(endpoint: string, options: RequestInit = {}) {
+  const response = await fetch(endpoint, {
+    credentials: 'same-origin',
+    ...options,
+    headers: {
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(options.headers ?? {}),
+    },
+  });
+
+  if (response.status === 204) {
+    return { user: null } satisfies AuthResponse;
+  }
+
+  const data = (await response.json().catch(() => ({}))) as Partial<AuthResponse>;
+  if (!response.ok) {
+    throw new Error(typeof data.error === 'string' ? data.error : 'Request failed.');
+  }
+
+  return {
+    user: data.user ?? null,
+  } satisfies AuthResponse;
+}
+
 export function useGameClient() {
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authStatus, setAuthStatus] = useState<'loading' | 'ready'>('loading');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
-  const [playerName, setPlayerName] = useState(getStoredPlayerName);
   const [inputRoomId, setInputRoomId] = useState(getInitialRoomId);
   const [isJoined, setIsJoined] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
@@ -24,12 +65,76 @@ export function useGameClient() {
   const isMyTurn = isCurrentTurn(gameState, socket?.id);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const loadSession = async () => {
+      try {
+        const response = await requestAuth('/api/auth/session');
+        if (isMounted) {
+          setAuthUser(response.user);
+          setAuthError(null);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setAuthError(error instanceof Error ? error.message : 'Unable to load session.');
+        }
+      } finally {
+        if (isMounted) {
+          setAuthStatus('ready');
+        }
+      }
+    };
+
+    loadSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!authUser) {
+      setSocket(currentSocket => {
+        currentSocket?.close();
+        return null;
+      });
+      setGameState(null);
+      setIsJoined(false);
+      setJoinError(null);
+      activeRoomIdRef.current = '';
+      return;
+    }
+
     const newSocket = io();
     setSocket(newSocket);
+    setGameState(null);
+    setIsJoined(false);
+    setJoinError(null);
+
+    newSocket.on('connect', () => {
+      setJoinError(null);
+    });
+
+    newSocket.on('connect_error', (error) => {
+      setGameState(null);
+      setIsJoined(false);
+      setJoinError(error.message || 'Unable to connect to the game server.');
+    });
+
+    newSocket.on('disconnect', (reason) => {
+      if (reason === 'io client disconnect') {
+        return;
+      }
+
+      setIsJoined(false);
+      setGameState(null);
+      setJoinError('Connection to the game server was lost. Please try again.');
+    });
 
     newSocket.on('stateUpdate', (state: GameState) => {
       setGameState(state);
       setJoinError(null);
+      setIsJoined(true);
     });
 
     newSocket.on('joinError', (error: string) => {
@@ -46,30 +151,101 @@ export function useGameClient() {
 
     return () => {
       newSocket.close();
+      setSocket(currentSocket => (currentSocket === newSocket ? null : currentSocket));
     };
-  }, []);
+  }, [authUser?.id]);
+
+  const login = async (payload: LoginPayload) => {
+    setIsAuthSubmitting(true);
+    setAuthError(null);
+
+    try {
+      const response = await requestAuth('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      setAuthUser(response.user);
+      return true;
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Unable to log in.');
+      return false;
+    } finally {
+      setIsAuthSubmitting(false);
+    }
+  };
+
+  const signup = async (payload: SignupPayload) => {
+    setIsAuthSubmitting(true);
+    setAuthError(null);
+
+    try {
+      const response = await requestAuth('/api/auth/signup', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      setAuthUser(response.user);
+      return true;
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Unable to sign up.');
+      return false;
+    } finally {
+      setIsAuthSubmitting(false);
+    }
+  };
+
+  const logout = async () => {
+    setAuthError(null);
+
+    try {
+      await requestAuth('/api/auth/logout', { method: 'POST' });
+    } finally {
+      setAuthUser(null);
+      setGameState(null);
+      setIsJoined(false);
+      setJoinError(null);
+      setInputRoomId('');
+      activeRoomIdRef.current = '';
+      clearRoomQuery();
+    }
+  };
 
   const joinGame = () => {
-    if (!playerName.trim() || !socket || !inputRoomId.trim()) return;
+    if (!authUser) {
+      setJoinError('You must be logged in to join a room.');
+      return;
+    }
+    if (!inputRoomId.trim()) {
+      setJoinError('Enter a room code to join.');
+      return;
+    }
+    if (!socket || !socket.connected) {
+      setJoinError('Connecting to game server. Try again in a moment.');
+      return;
+    }
+
     setJoinError(null);
     const roomId = inputRoomId.trim();
     activeRoomIdRef.current = roomId;
     setRoomQuery(roomId);
-    storePlayerName(playerName);
-    socket.emit('joinRoom', { roomId, playerName });
-    setIsJoined(true);
+    socket.emit('joinRoom', { roomId });
   };
 
   const createLobby = () => {
-    if (!playerName.trim() || !socket) return;
+    if (!authUser) {
+      setJoinError('You must be logged in to create a room.');
+      return;
+    }
+    if (!socket || !socket.connected) {
+      setJoinError('Connecting to game server. Try again in a moment.');
+      return;
+    }
+
     setJoinError(null);
     const roomId = createRoomId();
     activeRoomIdRef.current = roomId;
     setInputRoomId(roomId);
     setRoomQuery(roomId);
-    storePlayerName(playerName);
-    socket.emit('joinRoom', { roomId, playerName });
-    setIsJoined(true);
+    socket.emit('joinRoom', { roomId });
   };
 
   const sendChatMessage = (text: string) => {
@@ -103,22 +279,28 @@ export function useGameClient() {
   };
 
   return {
+    authError,
+    authStatus,
+    authUser,
+    clearAuthError: () => setAuthError(null),
     createLobby,
     gameState,
     inputRoomId,
+    isAuthSubmitting,
     isJoined,
     isMyTurn,
     joinError,
     joinGame,
     kickPlayer,
+    login,
+    logout,
     me,
-    playerName,
     requestStartGame,
     resetGame,
     sendChatMessage,
     setInputRoomId,
-    setPlayerName,
     socketId: socket?.id,
+    signup,
     submitHint,
     submitImposterGuess,
     submitVote,

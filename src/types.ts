@@ -1,5 +1,12 @@
 export type PlayerRole = 'player' | 'imposter' | 'spectator';
 
+export interface AuthUser {
+  id: number;
+  username: string;
+  email: string;
+  createdAt: string;
+}
+
 export interface Message {
   id: string;
   playerId: string;

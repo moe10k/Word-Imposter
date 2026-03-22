@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "skipLibCheck": true,
+    "allowJs": true,
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "noEmit": true
+  },
+  "include": [
+    "server.ts",
+    "server/**/*.ts",
+    "scripts/**/*.ts",
+    "src/types.ts",
+    "src/constants/**/*.ts",
+    "src/services/openai.ts"
+  ]
+}

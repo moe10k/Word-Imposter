@@ -5,16 +5,17 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build",
+    "build": "vite build && node scripts/build-server.mjs",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "db:setup": "tsx scripts/setup-db.ts",
-    "lint": "tsc --noEmit",
-    "start": "node --experimental-strip-types server.ts",
-    "test": "node --test --experimental-strip-types tests/auth.test.ts"
+    "db:setup": "tsx scripts/migrate.ts",
+    "lint": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit",
+    "smoke:prod": "npm run build && node scripts/smoke-production.mjs",
+    "start": "node build/server.js",
+    "test": "node --test --experimental-strip-types tests/auth.test.ts tests/db.test.ts tests/migrations.test.ts"
   },
   "engines": {
-    "node": ">=22.6.0"
+    "node": "24.x"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
@@ -35,6 +36,7 @@
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
+    "esbuild": "^0.25.10",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",

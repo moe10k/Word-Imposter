@@ -3,26 +3,70 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import type { GameState } from './src/types.ts';
 import { registerAuthRoutes } from './server/auth/http.ts';
+import { getSessionSecret, getSessionTtlMs } from './server/auth/session.ts';
 import { getSessionUserFromCookieHeader } from './server/auth/service.ts';
 import { createMySqlAuthStore } from './server/auth/store.ts';
-import { getDbPool } from './server/db.ts';
+import { closeDbPool, getDatabaseConfig, getDbPool } from './server/db.ts';
 import { checkWinCondition, nextTurn, resolveVoting } from './server/gameFlow.ts';
 import { registerSocketHandlers } from './server/registerSocketHandlers.ts';
 import { createPlayerStateView } from './server/stateView.ts';
 
+function getAppUrl() {
+  const appUrl = process.env.APP_URL?.trim();
+  if (!appUrl) {
+    throw new Error('APP_URL is not set. Add it to your environment before starting the server.');
+  }
+
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(appUrl);
+  } catch {
+    throw new Error('APP_URL must be a valid absolute URL.');
+  }
+
+  if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+    throw new Error('APP_URL must use the http:// or https:// protocol.');
+  }
+
+  return parsedUrl;
+}
+
+function validateStartupConfig(nodeEnv: string) {
+  getDatabaseConfig();
+  getSessionSecret();
+  getSessionTtlMs();
+
+  if (nodeEnv === 'production') {
+    getAppUrl();
+  }
+}
+
 async function startServer() {
+  const nodeEnv = process.env.NODE_ENV ?? 'development';
+  validateStartupConfig(nodeEnv);
+
   const app = express();
+  app.set('trust proxy', 1);
   app.use(express.json());
 
+  const appUrl = process.env.APP_URL?.trim() ? getAppUrl() : null;
+  const allowedOrigin = nodeEnv === 'production' ? appUrl?.origin ?? null : null;
   const authStore = createMySqlAuthStore(getDbPool());
   const httpServer = createServer(app);
   const io = new Server(httpServer, {
     cors: {
-      origin: '*',
-      methods: ['GET', 'POST']
+      origin: (origin, callback) => {
+        if (!allowedOrigin || !origin || origin === allowedOrigin) {
+          callback(null, true);
+          return;
+        }
+
+        callback(new Error('Socket origin is not allowed by CORS.'));
+      },
+      methods: ['GET', 'POST'],
+      credentials: true,
     }
   });
 
@@ -50,6 +94,24 @@ async function startServer() {
   };
 
   const rooms: Record<string, GameState> = {};
+  let isShuttingDown = false;
+
+  app.get('/healthz', async (_request, response) => {
+    if (isShuttingDown) {
+      response.status(503).json({ status: 'shutting_down' });
+      return;
+    }
+
+    try {
+      await getDbPool().query('SELECT 1');
+      response.json({ status: 'ok' });
+    } catch (error) {
+      response.status(503).json({
+        status: 'degraded',
+        error: error instanceof Error ? error.message : 'Database health check failed.',
+      });
+    }
+  });
 
   registerAuthRoutes(app, authStore);
 
@@ -75,6 +137,7 @@ async function startServer() {
   const clearTimer = (roomId: string) => {
     if (timers[roomId]) {
       clearInterval(timers[roomId]);
+      delete timers[roomId];
     }
   };
   const clearRoundTimer = (roomId: string) => {
@@ -96,6 +159,7 @@ async function startServer() {
       room.timer--;
       if (room.timer <= 0) {
         clearInterval(timers[roomId]);
+        delete timers[roomId];
         onComplete();
       }
       broadcastState(roomId);
@@ -139,12 +203,15 @@ async function startServer() {
     runResolveVoting,
   });
 
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
+  let vite: { close(): Promise<void> } | null = null;
+  if (nodeEnv !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
+    const viteServer = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
-    app.use(vite.middlewares);
+    vite = viteServer;
+    app.use(viteServer.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
@@ -153,9 +220,55 @@ async function startServer() {
     });
   }
 
+  const clearAllTimers = () => {
+    Object.keys(timers).forEach(clearTimer);
+  };
+
+  const shutdown = async (signal: string) => {
+    if (isShuttingDown) {
+      return;
+    }
+
+    isShuttingDown = true;
+    console.log(`Received ${signal}. Shutting down gracefully.`);
+    clearAllTimers();
+
+    try {
+      await vite?.close();
+      await new Promise<void>((resolve, reject) => {
+        io.close(error => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve();
+        });
+      });
+      await closeDbPool();
+    } catch (error) {
+      console.error('Graceful shutdown failed:', error);
+      process.exitCode = 1;
+    } finally {
+      process.exit();
+    }
+  };
+
+  process.once('SIGINT', () => {
+    void shutdown('SIGINT');
+  });
+  process.once('SIGTERM', () => {
+    void shutdown('SIGTERM');
+  });
+
   httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    const address = httpServer.address();
+    const resolvedPort =
+      typeof address === 'object' && address ? address.port : PORT;
+    console.log(`Server running on http://127.0.0.1:${resolvedPort}`);
   });
 }
 
-startServer();
+startServer().catch(error => {
+  console.error('Failed to start server:', error);
+  process.exitCode = 1;
+});

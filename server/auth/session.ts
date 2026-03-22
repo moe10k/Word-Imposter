@@ -4,7 +4,7 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'crypto';
 const DEFAULT_SESSION_COOKIE_NAME = 'word_imposter_session';
 const DEFAULT_SESSION_TTL_DAYS = 7;
 
-function getSessionSecret() {
+export function getSessionSecret() {
   const secret = process.env.SESSION_SECRET?.trim();
   if (!secret) {
     throw new Error('SESSION_SECRET is not set. Add it to your environment before starting the server.');

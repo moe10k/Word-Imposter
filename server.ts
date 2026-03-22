@@ -5,12 +5,19 @@ import { Server } from 'socket.io';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import type { GameState } from './src/types.ts';
+import { registerAuthRoutes } from './server/auth/http.ts';
+import { getSessionUserFromCookieHeader } from './server/auth/service.ts';
+import { createMySqlAuthStore } from './server/auth/store.ts';
+import { getDbPool } from './server/db.ts';
 import { checkWinCondition, nextTurn, resolveVoting } from './server/gameFlow.ts';
 import { registerSocketHandlers } from './server/registerSocketHandlers.ts';
 import { createPlayerStateView } from './server/stateView.ts';
 
 async function startServer() {
   const app = express();
+  app.use(express.json());
+
+  const authStore = createMySqlAuthStore(getDbPool());
   const httpServer = createServer(app);
   const io = new Server(httpServer, {
     cors: {
@@ -43,6 +50,17 @@ async function startServer() {
   };
 
   const rooms: Record<string, GameState> = {};
+
+  registerAuthRoutes(app, authStore);
+
+  io.use(async (socket, next) => {
+    try {
+      socket.data.authUser = await getSessionUserFromCookieHeader(authStore, socket.handshake.headers.cookie);
+      next();
+    } catch (error) {
+      next(error as Error);
+    }
+  });
 
   const broadcastState = (roomId: string) => {
     const room = rooms[roomId];

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Users, Sword, AlertCircle, RefreshCw } from 'lucide-react';
+import { Users, Sword, AlertCircle, RefreshCw, LogOut } from 'lucide-react';
 import GameOverScreen from './components/GameOverScreen';
 import LobbyScreen from './components/LobbyScreen';
 import PlayingScreen from './components/PlayingScreen';
@@ -10,28 +10,41 @@ import { copyText } from './utils/clipboard';
 
 export default function App() {
   const {
+    authError,
+    authStatus,
+    authUser,
+    clearAuthError,
     createLobby,
     gameState,
     inputRoomId,
+    isAuthSubmitting,
     isJoined,
     isMyTurn,
     joinError,
     joinGame,
     kickPlayer,
+    login,
+    logout,
     me,
-    playerName,
     requestStartGame,
     resetGame,
     sendChatMessage,
     setInputRoomId,
-    setPlayerName,
     socketId,
+    signup,
     submitHint,
     submitImposterGuess,
     submitVote,
   } = useGameClient();
   const [userHint, setUserHint] = useState('');
   const [imposterGuess, setImposterGuess] = useState('');
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [authForm, setAuthForm] = useState({
+    username: '',
+    email: '',
+    identifier: '',
+    password: '',
+  });
   const [copySuccess, setCopySuccess] = useState(false);
   const [copyCodeSuccess, setCopyCodeSuccess] = useState(false);
   const [expandedPlayerIds, setExpandedPlayerIds] = useState<string[]>([]);
@@ -84,6 +97,43 @@ export default function App() {
     setImposterGuess('');
   };
 
+  const updateAuthField = (field: keyof typeof authForm, value: string) => {
+    clearAuthError();
+    setAuthForm(prev => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleLogin = async () => {
+    const success = await login({
+      identifier: authForm.identifier,
+      password: authForm.password,
+    });
+
+    if (success) {
+      setAuthForm(prev => ({
+        ...prev,
+        password: '',
+      }));
+    }
+  };
+
+  const handleSignup = async () => {
+    const success = await signup({
+      username: authForm.username,
+      email: authForm.email,
+      password: authForm.password,
+    });
+
+    if (success) {
+      setAuthForm(prev => ({
+        ...prev,
+        password: '',
+      }));
+    }
+  };
+
   const toggleExpandedPlayer = (playerId: string) => {
     setExpandedPlayerIds(prev =>
       prev.includes(playerId) ? prev.filter(id => id !== playerId) : [...prev, playerId]
@@ -107,6 +157,116 @@ export default function App() {
     window.location.href = window.location.pathname;
   };
 
+  if (authStatus === 'loading') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <RefreshCw className="w-12 h-12 text-indigo-600 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!authUser) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 font-sans">
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-slate-900 p-12 rounded-[3rem] shadow-2xl shadow-black/50 max-w-md w-full text-center space-y-8 border border-slate-800"
+        >
+          <div className="bg-indigo-600 p-6 rounded-3xl inline-block shadow-xl shadow-indigo-500/20">
+            <Sword className="w-12 h-12 text-white" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-4xl font-black tracking-tighter text-white uppercase font-display">WORD IMPOSTER</h1>
+            <p className="text-slate-500 font-medium text-sm">Create an account or log in to play</p>
+          </div>
+          <div className="space-y-4">
+            {authError && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-2xl text-xs font-bold flex items-center gap-2"
+              >
+                <AlertCircle className="w-4 h-4" />
+                {authError}
+              </motion.div>
+            )}
+            {authMode === 'signup' ? (
+              <div className="flex flex-col gap-3">
+                <input
+                  type="text"
+                  value={authForm.username}
+                  onChange={(e) => updateAuthField('username', e.target.value)}
+                  placeholder="Username"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-6 py-4 font-bold text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-600 transition-all text-center text-lg shadow-inner"
+                />
+                <input
+                  type="email"
+                  value={authForm.email}
+                  onChange={(e) => updateAuthField('email', e.target.value)}
+                  placeholder="Email"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-6 py-4 font-bold text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-600 transition-all text-center text-lg shadow-inner"
+                />
+                <input
+                  type="password"
+                  value={authForm.password}
+                  onChange={(e) => updateAuthField('password', e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSignup()}
+                  placeholder="Password"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-6 py-4 font-bold text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-600 transition-all text-center text-lg shadow-inner"
+                />
+                <button
+                  onClick={handleSignup}
+                  disabled={isAuthSubmitting}
+                  className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-900/20 disabled:opacity-70"
+                >
+                  {isAuthSubmitting ? 'Creating Account...' : 'Create Account'}
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <input
+                  type="text"
+                  value={authForm.identifier}
+                  onChange={(e) => updateAuthField('identifier', e.target.value)}
+                  placeholder="Username or Email"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-6 py-4 font-bold text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-600 transition-all text-center text-lg shadow-inner"
+                />
+                <input
+                  type="password"
+                  value={authForm.password}
+                  onChange={(e) => updateAuthField('password', e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                  placeholder="Password"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-6 py-4 font-bold text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-600 transition-all text-center text-lg shadow-inner"
+                />
+                <button
+                  onClick={handleLogin}
+                  disabled={isAuthSubmitting}
+                  className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-900/20 disabled:opacity-70"
+                >
+                  {isAuthSubmitting ? 'Logging In...' : 'Log In'}
+                </button>
+              </div>
+            )}
+
+            <button
+              onClick={() => {
+                clearAuthError();
+                setAuthMode(prev => (prev === 'login' ? 'signup' : 'login'));
+              }}
+              className="w-full text-slate-400 text-sm font-bold hover:text-white transition-colors"
+            >
+              {authMode === 'login'
+                ? 'Need an account? Create one'
+                : 'Already have an account? Log in'}
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
   if (!isJoined) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 font-sans">
@@ -120,7 +280,7 @@ export default function App() {
           </div>
           <div className="space-y-2">
             <h1 className="text-4xl font-black tracking-tighter text-white uppercase font-display">WORD IMPOSTER</h1>
-            <p className="text-slate-500 font-medium text-sm">Join the game to start playing</p>
+            <p className="text-slate-500 font-medium text-sm">Signed in as {authUser.username}</p>
           </div>
           <div className="space-y-4">
             {joinError && (
@@ -133,13 +293,12 @@ export default function App() {
                 {joinError}
               </motion.div>
             )}
-            <input
-              type="text"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              placeholder="Your Name"
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-6 py-4 font-bold text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-600 transition-all text-center text-lg shadow-inner"
-            />
+
+            <div className="bg-slate-800/60 border border-slate-700 rounded-2xl px-5 py-4 text-left">
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Account</p>
+              <p className="text-white font-bold text-lg">{authUser.username}</p>
+              <p className="text-slate-500 text-sm">{authUser.email}</p>
+            </div>
 
             <div className="h-px w-full bg-slate-800 my-4" />
 
@@ -149,7 +308,7 @@ export default function App() {
                   type="text"
                   value={inputRoomId}
                   onChange={(e) => setInputRoomId(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && joinGame()}
+                  onKeyDown={(e) => e.key === 'Enter' && joinGame()}
                   placeholder="Room Code"
                   className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 font-bold text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-600 transition-all text-center shadow-inner uppercase"
                 />
@@ -172,6 +331,13 @@ export default function App() {
                 className="w-full bg-slate-800 border-2 border-slate-700 text-white py-4 rounded-xl font-bold text-lg hover:border-indigo-500 hover:bg-slate-800/80 transition-all shadow-lg"
               >
                 Create New Lobby
+              </button>
+
+              <button
+                onClick={logout}
+                className="w-full bg-transparent border border-slate-700 text-slate-300 py-4 rounded-xl font-bold text-sm uppercase tracking-[0.2em] hover:border-slate-500 hover:text-white transition-all"
+              >
+                Log Out
               </button>
             </div>
           </div>
@@ -198,8 +364,11 @@ export default function App() {
             </div>
             <span className="font-black text-2xl tracking-tighter uppercase text-white">Word Imposter</span>
           </div>
-          {isJoined && (
+          {isJoined && authUser && (
             <div className="flex items-center gap-6">
+              <div className="hidden md:flex items-center gap-2 text-slate-500 font-black text-[10px] uppercase tracking-widest">
+                {authUser.username}
+              </div>
               {gameState.phase !== 'lobby' && (
                 <div className="hidden sm:flex items-center gap-2 text-slate-500 font-black text-[10px] uppercase tracking-widest">
                   <Users className="w-4 h-4" />
@@ -222,6 +391,13 @@ export default function App() {
                   Reset to Lobby
                 </button>
               )}
+              <button
+                onClick={logout}
+                className="bg-slate-900 hover:bg-slate-800 text-slate-400 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-slate-800 flex items-center gap-2"
+              >
+                <LogOut className="w-3 h-3" />
+                Logout
+              </button>
             </div>
           )}
         </div>

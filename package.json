@@ -8,8 +8,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
+    "db:setup": "tsx scripts/setup-db.ts",
     "lint": "tsc --noEmit",
-    "start": "node --experimental-strip-types server.ts"
+    "start": "node --experimental-strip-types server.ts",
+    "test": "node --test --experimental-strip-types tests/auth.test.ts"
   },
   "engines": {
     "node": ">=22.6.0"
@@ -20,6 +22,7 @@
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "lucide-react": "^0.546.0",
+    "mysql2": "^3.15.1",
     "motion": "^12.23.24",
     "openai": "^6.32.0",
     "react": "^19.0.0",

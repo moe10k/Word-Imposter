@@ -8,7 +8,7 @@ import { registerAuthRoutes } from './server/auth/http.ts';
 import { getSessionSecret, getSessionTtlMs } from './server/auth/session.ts';
 import { getSessionUserFromCookieHeader } from './server/auth/service.ts';
 import { createMySqlAuthStore } from './server/auth/store.ts';
-import { closeDbPool, getDatabaseConfig, getDbPool } from './server/db.ts';
+import { closeDbPool, getDatabaseConfig, getDatabaseSourceName, getDbPool } from './server/db.ts';
 import { checkWinCondition, nextTurn, resolveVoting } from './server/gameFlow.ts';
 import { registerSocketHandlers } from './server/registerSocketHandlers.ts';
 import { createPlayerStateView } from './server/stateView.ts';
@@ -43,6 +43,36 @@ function validateStartupConfig(nodeEnv: string) {
   }
 }
 
+function getFirstHeaderValue(header: string | string[] | undefined) {
+  if (Array.isArray(header)) {
+    return header[0];
+  }
+  return header;
+}
+
+function isAllowedSocketOrigin(origin: string | undefined, appUrl: URL | null, requestHost: string | undefined) {
+  if (!origin) {
+    return true;
+  }
+
+  let originUrl: URL;
+  try {
+    originUrl = new URL(origin);
+  } catch {
+    return false;
+  }
+
+  const allowedHosts = new Set<string>();
+  if (appUrl) {
+    allowedHosts.add(appUrl.host.toLowerCase());
+  }
+  if (requestHost) {
+    allowedHosts.add(requestHost.toLowerCase());
+  }
+
+  return allowedHosts.has(originUrl.host.toLowerCase());
+}
+
 async function startServer() {
   const nodeEnv = process.env.NODE_ENV ?? 'development';
   validateStartupConfig(nodeEnv);
@@ -52,22 +82,26 @@ async function startServer() {
   app.use(express.json());
 
   const appUrl = process.env.APP_URL?.trim() ? getAppUrl() : null;
-  const allowedOrigin = nodeEnv === 'production' ? appUrl?.origin ?? null : null;
   const authStore = createMySqlAuthStore(getDbPool());
   const httpServer = createServer(app);
   const io = new Server(httpServer, {
     cors: {
-      origin: (origin, callback) => {
-        if (!allowedOrigin || !origin || origin === allowedOrigin) {
-          callback(null, true);
-          return;
-        }
-
-        callback(new Error('Socket origin is not allowed by CORS.'));
-      },
+      origin: true,
       methods: ['GET', 'POST'],
       credentials: true,
-    }
+    },
+    allowRequest: (request, callback) => {
+      if (nodeEnv !== 'production') {
+        callback(null, true);
+        return;
+      }
+
+      const forwardedHost = getFirstHeaderValue(request.headers['x-forwarded-host']);
+      const directHost = getFirstHeaderValue(request.headers.host);
+      const requestHost = forwardedHost ?? directHost;
+      const allowed = isAllowedSocketOrigin(request.headers.origin, appUrl, requestHost);
+      callback(null, allowed);
+    },
   });
 
   const PORT = Number(process.env.PORT) || 3000;
@@ -95,6 +129,8 @@ async function startServer() {
 
   const rooms: Record<string, GameState> = {};
   let isShuttingDown = false;
+
+  console.log(`Database config source: ${getDatabaseSourceName()}`);
 
   app.get('/healthz', async (_request, response) => {
     if (isShuttingDown) {

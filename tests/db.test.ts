@@ -11,6 +11,7 @@ describe('database config', () => {
   beforeEach(() => {
     delete process.env.DATABASE_URL;
     delete process.env.JAWSDB_URL;
+    delete process.env.JAWSDB_MARIA_URL;
     delete process.env.CLEARDB_DATABASE_URL;
     delete process.env.STACKHERO_MYSQL_DATABASE_URL;
     delete process.env.DB_HOST;
@@ -37,6 +38,18 @@ describe('database config', () => {
     assert.equal(config.user, 'database-user');
     assert.equal(config.password, 'database-pass');
     assert.equal(config.database, 'primary_name');
+  });
+
+  it('supports JAWSDB_MARIA_URL when that is the configured provider env var', () => {
+    process.env.JAWSDB_MARIA_URL = 'mysql://maria-user:maria-pass@maria-db:3306/maria_name';
+
+    const databaseUrl = getDatabaseUrl();
+    const config = getDatabaseConnectionConfig();
+
+    assert.equal(databaseUrl?.name, 'JAWSDB_MARIA_URL');
+    assert.equal(config.host, 'maria-db');
+    assert.equal(config.user, 'maria-user');
+    assert.equal(config.database, 'maria_name');
   });
 
   it('falls back to split DB vars when no URL is configured', () => {

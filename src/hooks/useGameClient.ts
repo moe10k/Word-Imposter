@@ -111,6 +111,26 @@ export function useGameClient() {
     setIsJoined(false);
     setJoinError(null);
 
+    newSocket.on('connect', () => {
+      setJoinError(null);
+    });
+
+    newSocket.on('connect_error', (error) => {
+      setGameState(null);
+      setIsJoined(false);
+      setJoinError(error.message || 'Unable to connect to the game server.');
+    });
+
+    newSocket.on('disconnect', (reason) => {
+      if (reason === 'io client disconnect') {
+        return;
+      }
+
+      setIsJoined(false);
+      setGameState(null);
+      setJoinError('Connection to the game server was lost. Please try again.');
+    });
+
     newSocket.on('stateUpdate', (state: GameState) => {
       setGameState(state);
       setJoinError(null);
@@ -198,7 +218,7 @@ export function useGameClient() {
       setJoinError('Enter a room code to join.');
       return;
     }
-    if (!socket) {
+    if (!socket || !socket.connected) {
       setJoinError('Connecting to game server. Try again in a moment.');
       return;
     }
@@ -208,7 +228,6 @@ export function useGameClient() {
     activeRoomIdRef.current = roomId;
     setRoomQuery(roomId);
     socket.emit('joinRoom', { roomId });
-    setIsJoined(true);
   };
 
   const createLobby = () => {
@@ -216,7 +235,7 @@ export function useGameClient() {
       setJoinError('You must be logged in to create a room.');
       return;
     }
-    if (!socket) {
+    if (!socket || !socket.connected) {
       setJoinError('Connecting to game server. Try again in a moment.');
       return;
     }
@@ -227,7 +246,6 @@ export function useGameClient() {
     setInputRoomId(roomId);
     setRoomQuery(roomId);
     socket.emit('joinRoom', { roomId });
-    setIsJoined(true);
   };
 
   const sendChatMessage = (text: string) => {

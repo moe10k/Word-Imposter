@@ -8,6 +8,7 @@ const DEFAULT_DATABASE_CONNECTION_LIMIT = 10;
 const DATABASE_URL_ENV_NAMES = [
   'DATABASE_URL',
   'JAWSDB_URL',
+  'JAWSDB_MARIA_URL',
   'CLEARDB_DATABASE_URL',
   'STACKHERO_MYSQL_DATABASE_URL',
 ] as const;
@@ -67,6 +68,10 @@ export function getDatabaseUrl(env = process.env) {
   }
 
   return null;
+}
+
+export function getDatabaseSourceName(env = process.env) {
+  return getDatabaseUrl(env)?.name ?? 'DB_*';
 }
 
 export function getDatabaseSslConfig(env = process.env) {

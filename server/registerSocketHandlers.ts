@@ -1,5 +1,6 @@
 import type { Server } from 'socket.io';
 import type { GameState } from '../src/types.ts';
+import { isSkipVoteId } from '../src/constants/voting.ts';
 import { generateGameWords } from '../src/services/openai.ts';
 import {
   createGameState,
@@ -177,6 +178,19 @@ export function registerSocketHandlers({
     socket.on('submitVote', ({ roomId, votedId }) => {
       const room = rooms[roomId];
       if (!room || room.phase !== 'voting') return;
+
+      const voter = room.players.find(currentPlayer => currentPlayer.id === socket.id);
+      if (!voter || voter.role === 'spectator' || voter.isEliminated) return;
+      if (typeof votedId !== 'string' || room.lastVoteResults[socket.id]) return;
+
+      const isValidPlayerTarget = room.players.some(player =>
+        player.id === votedId &&
+        player.id !== socket.id &&
+        !player.isEliminated &&
+        player.role !== 'spectator'
+      );
+      const isValidVote = isSkipVoteId(votedId) || isValidPlayerTarget;
+      if (!isValidVote) return;
 
       room.lastVoteResults[socket.id] = votedId;
 

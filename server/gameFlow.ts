@@ -1,4 +1,5 @@
 import type { GameState } from '../src/types.ts';
+import { SKIP_VOTE_ID, isSkipVoteId } from '../src/constants/voting.ts';
 import {
   createMessage,
   getActivePlayers,
@@ -138,18 +139,20 @@ export function resolveVoting(roomId: string, rooms: Rooms, deps: ResolveVotingD
     voteCounts[id] = (voteCounts[id] || 0) + 1;
   });
 
-  let maxVotes = -1;
-  let eliminatedId = '';
-  Object.entries(voteCounts).forEach(([id, count]) => {
-    if (count > maxVotes) {
-      maxVotes = count;
-      eliminatedId = id;
-    }
-  });
+  const rankedVotes = Object.entries(voteCounts).sort((a, b) => b[1] - a[1]);
+  const [topResult, secondResult] = rankedVotes;
+  const winningVoteId = topResult?.[0] ?? '';
+  const topVoteCount = topResult?.[1] ?? 0;
+  const secondVoteCount = secondResult?.[1] ?? 0;
+  const hasUniqueWinner = topVoteCount > secondVoteCount;
+  const shouldEliminatePlayer =
+    hasUniqueWinner &&
+    !!winningVoteId &&
+    !isSkipVoteId(winningVoteId);
 
-  if (eliminatedId) {
-    room.eliminatedPlayerId = eliminatedId;
-    const eliminatedPlayer = room.players.find(player => player.id === eliminatedId);
+  if (shouldEliminatePlayer) {
+    room.eliminatedPlayerId = winningVoteId;
+    const eliminatedPlayer = room.players.find(player => player.id === winningVoteId);
     if (eliminatedPlayer) {
       eliminatedPlayer.isEliminated = true;
       room.messages.push(
@@ -163,8 +166,16 @@ export function resolveVoting(roomId: string, rooms: Rooms, deps: ResolveVotingD
     }
     deps.checkWinCondition(roomId);
   } else {
+    const skipWon = hasUniqueWinner && winningVoteId === SKIP_VOTE_ID;
     room.messages.push(
-      createMessage('system', 'System', 'No one was voted out this round.', { isSystem: true })
+      createMessage(
+        'system',
+        'System',
+        skipWon
+          ? 'The table chose to skip the vote. No one was voted out this round.'
+          : 'The vote was tied. No one was voted out this round.',
+        { isSystem: true }
+      )
     );
     deps.checkWinCondition(roomId);
   }

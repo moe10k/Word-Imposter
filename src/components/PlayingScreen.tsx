@@ -22,7 +22,7 @@ type PlayingScreenProps = {
   imposterGuess: string;
   onImposterGuessChange: (value: string) => void;
   onSubmitImposterGuess: () => void;
-  onSubmitVote: (playerId: string) => void;
+  onSubmitVote: (voteId: string) => void;
 };
 
 export default function PlayingScreen({

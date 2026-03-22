@@ -3,11 +3,7 @@ import type { Response } from "openai/resources/responses/responses";
 import type { Player, GameState } from "../types";
 
 const apiKey = process.env.OPENAI_API_KEY;
-if (!apiKey) {
-  throw new Error("OPENAI_API_KEY is not set. Add it to your environment before starting the server.");
-}
-
-const openai = new OpenAI({ apiKey });
+const openai = apiKey ? new OpenAI({ apiKey }) : null;
 const defaultModel = process.env.OPENAI_MODEL?.trim() || "gpt-4.1-nano";
 const wordMaxTokens = Number(process.env.OPENAI_WORD_MAX_TOKENS ?? 48);
 const hintMaxTokens = Number(process.env.OPENAI_HINT_MAX_TOKENS ?? 8);
@@ -25,6 +21,7 @@ const FALLBACK_WORDS: Array<{ secretWord: string; imposterWord: string }> = [
 const REQUEST_WINDOW_MS = 60_000;
 const maxRequestsPerMinute = Number(process.env.OPENAI_REQUESTS_PER_MINUTE ?? 120);
 const requestTimestamps: number[] = [];
+type CreateResponseParams = Parameters<OpenAI["responses"]["create"]>[0];
 
 const sanitizeSingleWord = (text: string) => {
   return text.trim().split(/\s+/)[0]?.replace(/[^a-z]/gi, "") ?? "";
@@ -61,9 +58,12 @@ const tryConsumeRequestBudget = () => {
 };
 
 const createResponse = async (
-  params: Parameters<typeof openai.responses.create>[0],
+  params: CreateResponseParams,
   context: string
 ): Promise<Response> => {
+  if (!openai) {
+    throw new Error("OPENAI_API_KEY is not set.");
+  }
   if (!tryConsumeRequestBudget()) {
     throw new Error(`OpenAI request budget exceeded for ${context}`);
   }

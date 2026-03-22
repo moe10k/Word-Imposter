@@ -39,14 +39,16 @@ export function registerSocketHandlers({
   runResolveVoting,
 }: RegisterSocketHandlersParams) {
   io.on('connection', (socket) => {
-    socket.on('joinRoom', ({ roomId, playerName }) => {
+    socket.on('joinRoom', ({ roomId }) => {
       if (typeof roomId !== 'string' || !/^[a-z0-9]{1,20}$/i.test(roomId)) return;
-      if (typeof playerName !== 'string' || !playerName.trim() || playerName.length > 20) {
-        socket.emit('joinError', 'Invalid name. Max 20 characters.');
+
+      const authUser = socket.data.authUser as { username?: string } | null | undefined;
+      if (!authUser?.username) {
+        socket.emit('joinError', 'You must be logged in to join a room.');
         return;
       }
 
-      const sanitizedName = escapeHtml(playerName.trim());
+      const sanitizedName = escapeHtml(authUser.username.trim());
 
       if (!rooms[roomId]) {
         rooms[roomId] = createGameState(roomId);

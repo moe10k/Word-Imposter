@@ -33,95 +33,118 @@ export default function ChatPanel({
   const isSpectator = isSpectatorPlayer(me);
 
   return (
-    <div className="bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl border border-slate-800 flex flex-col" style={{ height }}>
-      <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
-        <MessageSquare className="w-4 h-4 text-indigo-500" />
-        {isPlaying ? 'Game Log & Hints' : 'Lobby Chat'}
-      </h3>
-      <div
-        ref={chatContainerRef}
-        className="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar min-h-0"
-      >
-        <AnimatePresence mode="popLayout">
-          {gameState.messages.map((msg) => {
-            const isMe = msg.playerId === socketId;
-            const isSystem = msg.isSystem;
-            const isWarning = msg.isWarning;
+    <div
+      className="relative overflow-hidden rounded-[2.5rem] border border-amber-500/15 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,1))] p-8 shadow-2xl shadow-black/40"
+      style={{ height }}
+    >
+      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/45 to-transparent" />
 
-            if (isSystem) {
-              return (
-                <motion.div
-                  key={msg.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex justify-center my-2"
-                >
-                  <span className="bg-slate-800/50 text-slate-500 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border border-slate-700/50">
-                    {msg.text}
-                  </span>
-                </motion.div>
-              );
-            }
-
-            return (
-              <motion.div
-                key={msg.id}
-                initial={{ x: isMe ? 20 : -20, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                className={`flex items-start gap-3 ${isMe ? 'flex-row-reverse' : ''}`}
-              >
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-lg ${isMe ? 'bg-indigo-600' : 'bg-slate-800'}`}>
-                  <User className={`w-5 h-5 ${isMe ? 'text-white' : 'text-slate-500'}`} />
-                </div>
-                <div className={`group relative p-4 rounded-2xl max-w-[85%] shadow-lg ${isMe
-                  ? 'bg-indigo-600 text-white rounded-tr-none'
-                  : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700'
-                  }`}>
-                  <div className={`flex items-center gap-2 mb-1 ${isMe ? 'justify-end' : ''}`}>
-                    <span className="text-[10px] font-black opacity-60 uppercase tracking-widest">{msg.playerName}</span>
-                    <span className="text-[9px] opacity-40 font-bold">
-                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                  <div className={`font-bold text-lg leading-tight ${isWarning ? 'text-red-400' : ''}`}>
-                    {msg.text}
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
-      </div>
-
-      {(!isPlaying || (isMyTurn && !isSpectator)) && (
-        <div className="mt-8 flex gap-3">
-          <input
-            type="text"
-            value={userHint}
-            onChange={(e) => onUserHintChange(e.target.value)}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter') {
-                if (isPlaying) {
-                  onSubmitHint();
-                } else {
-                  onSendChat();
-                }
-              }
-            }}
-            placeholder={isPlaying ? 'Enter a 1-word hint...' : 'Type a message...'}
-            className="flex-1 bg-slate-800 border-2 border-slate-700 rounded-2xl px-6 py-4 font-bold text-white focus:outline-none focus:border-indigo-600 transition-all text-base"
-          />
-          <button
-            onClick={() => {
-              if (isPlaying) onSubmitHint();
-              else onSendChat();
-            }}
-            className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-base hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-900/20"
-          >
-            Send
-          </button>
+      <div className="flex h-full flex-col">
+        <div className="mb-6 flex items-center justify-between gap-4 border-b border-amber-500/12 pb-5">
+          <h3 className="flex items-center gap-3 text-xs font-black uppercase tracking-[0.28em] text-amber-200/75">
+            <MessageSquare className="h-4 w-4 text-amber-400" />
+            {isPlaying ? 'Game Log & Hints' : 'Lobby Chat'}
+          </h3>
+          <div className="rounded-full border border-amber-500/20 bg-slate-950/70 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
+            {gameState.messages.length} Entries
+          </div>
         </div>
-      )}
+
+        <div
+          ref={chatContainerRef}
+          className="flex-1 overflow-y-auto pr-2 custom-scrollbar min-h-0"
+        >
+          <div className="space-y-4">
+            <AnimatePresence mode="popLayout">
+              {gameState.messages.map((msg) => {
+                const isMe = msg.playerId === socketId;
+                const isSystem = msg.isSystem;
+                const isWarning = msg.isWarning;
+
+                if (isSystem) {
+                  return (
+                    <motion.div
+                      key={msg.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex justify-center py-1"
+                    >
+                      <span className="rounded-full border border-amber-500/15 bg-slate-950/80 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
+                        {msg.text}
+                      </span>
+                    </motion.div>
+                  );
+                }
+
+                return (
+                  <motion.div
+                    key={msg.id}
+                    initial={{ x: isMe ? 20 : -20, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    className={`flex items-start gap-4 ${isMe ? 'flex-row-reverse' : ''}`}
+                  >
+                    <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border shadow-lg ${isMe
+                      ? 'border-amber-400/30 bg-amber-400/10 text-amber-100'
+                      : 'border-slate-800 bg-slate-950 text-slate-500'
+                      }`}>
+                      <User className="h-5 w-5" />
+                    </div>
+
+                    <div className={`max-w-[85%] rounded-[1.6rem] border px-5 py-4 shadow-lg ${isMe
+                      ? 'border-amber-400/20 bg-[linear-gradient(180deg,rgba(146,64,14,0.28),rgba(30,41,59,0.96))] text-white'
+                      : 'border-slate-700/80 bg-slate-900/92 text-slate-200'
+                      }`}>
+                      <div className={`mb-2 flex items-center gap-2 ${isMe ? 'justify-end' : ''}`}>
+                        <span className={`text-[10px] font-black uppercase tracking-[0.22em] ${isMe ? 'text-amber-200/75' : 'text-slate-500'}`}>
+                          {msg.playerName}
+                        </span>
+                        <span className={`text-[9px] font-bold ${isMe ? 'text-amber-100/35' : 'text-slate-600'}`}>
+                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <div className={`text-lg font-bold leading-tight ${isWarning ? 'text-red-400' : ''}`}>
+                        {msg.text}
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        {(!isPlaying || (isMyTurn && !isSpectator)) && (
+          <div className="mt-6 border-t border-amber-500/12 pt-6">
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={userHint}
+                onChange={(e) => onUserHintChange(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    if (isPlaying) {
+                      onSubmitHint();
+                    } else {
+                      onSendChat();
+                    }
+                  }
+                }}
+                placeholder={isPlaying ? 'Enter a 1-word hint...' : 'Type a message...'}
+                className="flex-1 rounded-2xl border border-slate-700 bg-slate-900/90 px-6 py-4 text-base font-bold text-white shadow-inner shadow-black/20 transition-all placeholder:text-slate-500 focus:border-amber-400/45 focus:outline-none"
+              />
+              <button
+                onClick={() => {
+                  if (isPlaying) onSubmitHint();
+                  else onSendChat();
+                }}
+                className="rounded-2xl border border-amber-400/30 bg-amber-400/90 px-8 py-4 text-base font-black text-slate-950 transition-all hover:bg-amber-300 shadow-xl shadow-amber-950/10"
+              >
+                Send
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

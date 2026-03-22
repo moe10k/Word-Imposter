@@ -84,8 +84,8 @@ export function useGameClient() {
     socket?.emit('submitHint', { roomId: activeRoomIdRef.current, hint });
   };
 
-  const submitVote = (votedId: string) => {
-    socket?.emit('submitVote', { roomId: activeRoomIdRef.current, votedId });
+  const submitVote = (voteId: string) => {
+    socket?.emit('submitVote', { roomId: activeRoomIdRef.current, votedId: voteId });
   };
 
   const submitImposterGuess = (guess: string) => {

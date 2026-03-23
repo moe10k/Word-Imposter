@@ -43,7 +43,6 @@ export default function LobbyScreen({
   onSendChat,
   chatContainerRef,
 }: LobbyScreenProps) {
-  const readyCount = gameState.players.filter(player => player.isReady).length;
   const startDisabled = gameState.players.filter(player => player.role === 'player').length < 3;
 
   return (
@@ -64,9 +63,6 @@ export default function LobbyScreen({
           <div className="bg-slate-900 rounded-[2rem] p-8 shadow-2xl border border-slate-800 space-y-6">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em]">Player List</h3>
-              <div className="bg-slate-800 px-3 py-1 rounded-lg text-[10px] font-bold text-slate-400 border border-slate-700 uppercase tracking-widest">
-                {readyCount}/{gameState.players.length} Ready
-              </div>
             </div>
             <PlayerList
               gameState={gameState}

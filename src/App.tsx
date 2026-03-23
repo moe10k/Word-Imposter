@@ -49,6 +49,7 @@ export default function App() {
   const [copyCodeSuccess, setCopyCodeSuccess] = useState(false);
   const [expandedPlayerIds, setExpandedPlayerIds] = useState<string[]>([]);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollRef = useRef(true);
 
   const messagesLength = getMessageCount(gameState);
 
@@ -58,7 +59,7 @@ export default function App() {
     const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
     const isNearBottom = scrollHeight - scrollTop - clientHeight < 20;
 
-    if (force || isNearBottom) {
+    if (force || shouldAutoScrollRef.current || isNearBottom) {
       chatContainerRef.current.scrollTo({
         top: scrollHeight,
         behavior: 'smooth'
@@ -67,16 +68,40 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (messagesLength > 0) {
-      scrollToBottom();
-    }
-  }, [messagesLength, scrollToBottom]);
+    const chatContainer = chatContainerRef.current;
+    if (!chatContainer) return;
+
+    const updateAutoScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = chatContainer;
+      shouldAutoScrollRef.current = scrollHeight - scrollTop - clientHeight < 40;
+    };
+
+    updateAutoScroll();
+    chatContainer.addEventListener('scroll', updateAutoScroll);
+
+    return () => {
+      chatContainer.removeEventListener('scroll', updateAutoScroll);
+    };
+  }, [gameState?.phase]);
+
+  useEffect(() => {
+    if (messagesLength <= 0) return;
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      scrollToBottom(gameState?.phase === 'lobby');
+    });
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+    };
+  }, [gameState?.phase, messagesLength, scrollToBottom]);
 
   useEffect(() => {
     if (gameState?.phase === 'lobby') {
       setUserHint('');
       setImposterGuess('');
       setExpandedPlayerIds([]);
+      shouldAutoScrollRef.current = true;
     }
   }, [gameState?.phase]);
 

@@ -44,7 +44,7 @@ export function initializeGame(room: GameState, secretWord: string, imposterWord
   room.phase = 'playing';
   room.round = 1;
   room.messages = [];
-  room.imposterGuesses = 3;
+  room.imposterGuesses = 1;
 
   const players = getConnectedPlayersByRole(room, 'player');
   const shuffledPlayers = [...players].sort(() => Math.random() - 0.5);
@@ -123,7 +123,7 @@ export function checkWinCondition(roomId: string, rooms: Rooms, deps: CheckWinCo
     room.lastVoteResults = {};
     room.eliminatedPlayerId = null;
     room.currentTurnPlayerId = null;
-    room.imposterGuesses = 3;
+    room.imposterGuesses = 1;
     deps.nextTurn(roomId);
   }
 

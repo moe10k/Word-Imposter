@@ -25,7 +25,7 @@ export function createGameState(roomId: string): GameState {
     lastVoteResults: {},
     timer: 0,
     maxTimer: 0,
-    imposterGuesses: 3,
+    imposterGuesses: 1,
   };
 }
 
@@ -76,5 +76,5 @@ export function resetRoomToLobby(room: GameState) {
   room.turnOrder = [];
   room.timer = 0;
   room.maxTimer = 0;
-  room.imposterGuesses = 3;
+  room.imposterGuesses = 1;
 }

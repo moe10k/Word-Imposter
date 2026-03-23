@@ -100,7 +100,7 @@ export default function PlayingScreen({
               <div className="space-y-3">
                 <div className="flex justify-between items-center px-1">
                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Guesses left</span>
-                  <span className="text-[10px] text-red-400 font-black">{gameState.imposterGuesses} / 3</span>
+                  <span className="text-[10px] text-red-400 font-black">{gameState.imposterGuesses} / 1</span>
                 </div>
                 <input
                   type="text"

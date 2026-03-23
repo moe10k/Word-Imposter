@@ -54,7 +54,7 @@ export default function ChatPanel({
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto pr-2 custom-scrollbar min-h-0"
         >
-          <div className="space-y-4">
+          <div className="space-y-3">
             <AnimatePresence mode="popLayout">
               {gameState.messages.map((msg) => {
                 const isMe = msg.playerId === socketId;
@@ -67,9 +67,9 @@ export default function ChatPanel({
                       key={msg.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="flex justify-center py-1"
+                      className="flex justify-center py-0.5"
                     >
-                      <span className="rounded-full border border-amber-500/15 bg-slate-950/80 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
+                      <span className="rounded-full border border-amber-500/15 bg-slate-950/80 px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">
                         {msg.text}
                       </span>
                     </motion.div>
@@ -81,28 +81,28 @@ export default function ChatPanel({
                     key={msg.id}
                     initial={{ x: isMe ? 20 : -20, opacity: 0 }}
                     animate={{ x: 0, opacity: 1 }}
-                    className={`flex items-start gap-4 ${isMe ? 'flex-row-reverse' : ''}`}
+                    className={`flex items-start gap-3 ${isMe ? 'flex-row-reverse' : ''}`}
                   >
-                    <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border shadow-lg ${isMe
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border shadow-lg ${isMe
                       ? 'border-amber-400/30 bg-amber-400/10 text-amber-100'
                       : 'border-slate-800 bg-slate-950 text-slate-500'
                       }`}>
-                      <User className="h-5 w-5" />
+                      <User className="h-4 w-4" />
                     </div>
 
-                    <div className={`max-w-[85%] rounded-[1.6rem] border px-5 py-4 shadow-lg ${isMe
+                    <div className={`max-w-[85%] rounded-[1.5rem] border px-4 py-3 shadow-lg ${isMe
                       ? 'border-amber-400/20 bg-[linear-gradient(180deg,rgba(146,64,14,0.28),rgba(30,41,59,0.96))] text-white'
                       : 'border-slate-700/80 bg-slate-900/92 text-slate-200'
                       }`}>
-                      <div className={`mb-2 flex items-center gap-2 ${isMe ? 'justify-end' : ''}`}>
-                        <span className={`text-[10px] font-black uppercase tracking-[0.22em] ${isMe ? 'text-amber-200/75' : 'text-slate-500'}`}>
+                      <div className={`mb-1.5 flex items-center gap-2 ${isMe ? 'justify-end' : ''}`}>
+                        <span className={`text-[9px] font-black uppercase tracking-[0.18em] ${isMe ? 'text-amber-200/75' : 'text-slate-500'}`}>
                           {msg.playerName}
                         </span>
-                        <span className={`text-[9px] font-bold ${isMe ? 'text-amber-100/35' : 'text-slate-600'}`}>
+                        <span className={`text-[8px] font-bold ${isMe ? 'text-amber-100/35' : 'text-slate-600'}`}>
                           {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
-                      <div className={`text-lg font-bold leading-tight ${isWarning ? 'text-red-400' : ''}`}>
+                      <div className={`text-sm font-bold leading-snug ${isWarning ? 'text-red-400' : ''}`}>
                         {msg.text}
                       </div>
                     </div>

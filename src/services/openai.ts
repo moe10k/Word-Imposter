@@ -9,6 +9,25 @@ const wordMaxTokens = Number(process.env.OPENAI_WORD_MAX_TOKENS ?? 48);
 const hintMaxTokens = Number(process.env.OPENAI_HINT_MAX_TOKENS ?? 8);
 const voteMaxTokens = Number(process.env.OPENAI_VOTE_MAX_TOKENS ?? 8);
 
+const GAME_WORD_PROMPT = [
+  "Return valid JSON in exactly this format: {\"secretWord\":\"\",\"imposterWord\":\"\"}.",
+  "",
+  "Choose two single-word everyday concrete nouns for Word Imposter.",
+  "",
+  "Constraints:",
+  "- Both words must fit the same broad category, such as foods, tools, animals, clothing, furniture, or household items.",
+  "- The two words must share general context, but must not be near-synonyms, direct substitutes, opposites, or common comparison pairs.",
+  "- Do not choose items that are typically found side-by-side, sold together, or commonly said as a pair.",
+  "- Each word should be distinct enough that clues for one do not immediately reveal the other.",
+  "- Avoid plurals, proper nouns, brands, abstract nouns, and multi-word phrases.",
+  "- Keep both words simple and commonly understood.",
+  "",
+  "Bad examples: fork/spoon, salt/pepper, couch/sofa, camera/tripod, rocket/missile.",
+  "Good style examples: burger/taco, blender/toaster, ladder/shovel, blanket/curtain.",
+  "",
+  "Return JSON only.",
+].join("\n");
+
 const FALLBACK_WORDS: Array<{ secretWord: string; imposterWord: string }> = [
   { secretWord: "Apple", imposterWord: "Pear" },
   { secretWord: "Beach", imposterWord: "Coast" },
@@ -75,8 +94,7 @@ export async function generateGameWords() {
     const response = await createResponse(
       {
         model: defaultModel,
-        input:
-          "Return JSON {\"secretWord\":\"\",\"imposterWord\":\"\"} for two related everyday nouns used in Word Imposter. The imposter word should be closely related to the secret word, but not so similar that the imposter can easily infer the secret word.",
+        input: GAME_WORD_PROMPT,
         max_output_tokens: wordMaxTokens,
       },
       "generateGameWords"

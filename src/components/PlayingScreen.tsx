@@ -106,6 +106,12 @@ export default function PlayingScreen({
                   type="text"
                   value={imposterGuess}
                   onChange={(e) => onImposterGuessChange(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      onSubmitImposterGuess();
+                    }
+                  }}
                   placeholder="Guess the word..."
                   className="w-full bg-slate-800 border-2 border-red-500/20 rounded-2xl px-5 py-3 text-sm font-black text-white focus:outline-none focus:border-red-500 uppercase"
                 />

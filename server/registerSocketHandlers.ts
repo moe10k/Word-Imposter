@@ -165,14 +165,19 @@ export function registerSocketHandlers({
       const room = rooms[roomId];
       if (!room || room.phase !== 'playing' || room.currentTurnPlayerId !== socket.id) return;
 
-      if (typeof hint !== 'string' || !hint.trim() || hint.trim().split(' ').length > 1 || hint.length > 30) {
+      if (typeof hint !== 'string') {
+        return;
+      }
+
+      const sanitizedHint = hint.trim();
+      if (!sanitizedHint || sanitizedHint.length > 120) {
         return;
       }
 
       const player = room.players.find(currentPlayer => currentPlayer.id === socket.id);
       if (player) {
-        player.hints.push(hint.trim());
-        room.messages.push(createMessage(player.id, player.name, hint.trim()));
+        player.hints.push(sanitizedHint);
+        room.messages.push(createMessage(player.id, player.name, sanitizedHint));
         runNextTurn(roomId);
       }
     });
@@ -206,10 +211,10 @@ export function registerSocketHandlers({
 
     socket.on('submitImposterGuess', ({ roomId, guess }) => {
       const room = rooms[roomId];
-      if (!room || room.phase !== 'playing') return;
+      if (!room || room.phase !== 'voting') return;
 
       const player = room.players.find(currentPlayer => currentPlayer.id === socket.id);
-      if (!player || player.role !== 'imposter') return;
+      if (!player || player.role !== 'imposter' || player.isEliminated) return;
       if (room.imposterGuesses <= 0) return;
 
       if (typeof guess !== 'string') return;
@@ -228,11 +233,18 @@ export function registerSocketHandlers({
 
       if (isCorrect) {
         clearTimer(roomId);
+        room.messages.push(
+          createMessage('system', 'System', `The Imposter guessed "${room.secretWord}" and stole the win!`, {
+            isSystem: true
+          })
+        );
         room.phase = 'gameOver';
         room.winner = 'imposter';
+        room.gameOverReason = 'imposterGuessedWord';
+        room.imposterWinningGuess = sanitizedGuess;
       } else if (room.imposterGuesses <= 0) {
         room.messages.push(
-          createMessage('system', 'System', 'The Imposter is out of guesses for this round!', {
+          createMessage('system', 'System', `The Imposter guessed "${sanitizedGuess}" incorrectly and is out of guesses for this round.`, {
             isSystem: true
           })
         );

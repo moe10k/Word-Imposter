@@ -44,6 +44,11 @@ export function initializeGame(room: GameState, secretWord: string, imposterWord
   room.phase = 'playing';
   room.round = 1;
   room.messages = [];
+  room.winner = null;
+  room.gameOverReason = null;
+  room.eliminatedPlayerId = null;
+  room.imposterWinningGuess = null;
+  room.lastVoteResults = {};
   room.imposterGuesses = 1;
 
   const players = getConnectedPlayersByRole(room, 'player');
@@ -112,16 +117,23 @@ export function checkWinCondition(roomId: string, rooms: Rooms, deps: CheckWinCo
   if (eliminatedPlayer?.role === 'imposter') {
     room.phase = 'gameOver';
     room.winner = 'players';
+    room.gameOverReason = 'playersCaughtImposter';
+    room.imposterWinningGuess = null;
     deps.clearTimer(roomId);
   } else if (activePlayers.length <= 2) {
     room.phase = 'gameOver';
     room.winner = 'imposter';
+    room.gameOverReason = 'imposterOutlastedPlayers';
+    room.imposterWinningGuess = null;
     deps.clearTimer(roomId);
   } else {
     room.phase = 'playing';
     room.round++;
+    room.winner = null;
+    room.gameOverReason = null;
     room.lastVoteResults = {};
     room.eliminatedPlayerId = null;
+    room.imposterWinningGuess = null;
     room.currentTurnPlayerId = null;
     room.imposterGuesses = 1;
     deps.nextTurn(roomId);

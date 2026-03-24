@@ -119,7 +119,7 @@ export default function VotingPanel({
                       <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
                         Last Hint
                       </span>
-                      <span className={`truncate text-sm ${player.isEliminated ? 'text-slate-600' : 'text-slate-300'}`}>
+                      <span className={`whitespace-normal break-words text-sm leading-snug ${player.isEliminated ? 'text-slate-600' : 'text-slate-300'}`}>
                         {latestHint}
                       </span>
                     </div>

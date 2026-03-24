@@ -115,9 +115,9 @@ export default function PlayerList({
                     {player.hints.length > 0 ? (
                       <div className="flex flex-col gap-2">
                         {player.hints.map((hint, index) => (
-                          <div key={index} className="flex items-center justify-between bg-slate-800/80 px-3 py-2 rounded-xl text-xs border border-slate-700/50">
+                          <div key={index} className="flex flex-col gap-1 bg-slate-800/80 px-3 py-2 rounded-xl text-xs border border-slate-700/50">
                             <span className="text-slate-500 font-black uppercase text-[9px]">Round {index + 1}</span>
-                            <span className="text-slate-200 font-bold">{hint}</span>
+                            <span className="break-words text-slate-200 font-bold leading-snug">{hint}</span>
                           </div>
                         ))}
                       </div>

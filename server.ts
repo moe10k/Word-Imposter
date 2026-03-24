@@ -4,9 +4,10 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
 import type { GameState } from './src/types.ts';
+import { getDevSessionTokenFromSocketAuth } from './server/auth/dev.ts';
 import { registerAuthRoutes } from './server/auth/http.ts';
 import { getSessionSecret, getSessionTtlMs } from './server/auth/session.ts';
-import { getSessionUserFromCookieHeader } from './server/auth/service.ts';
+import { getSessionUser, getSessionUserFromCookieHeader } from './server/auth/service.ts';
 import { createMySqlAuthStore } from './server/auth/store.ts';
 import { closeDbPool, getDatabaseConfig, getDatabaseSourceName, getDbPool } from './server/db.ts';
 import { checkWinCondition, nextTurn, resolveVoting } from './server/gameFlow.ts';
@@ -153,7 +154,10 @@ async function startServer() {
 
   io.use(async (socket, next) => {
     try {
-      socket.data.authUser = await getSessionUserFromCookieHeader(authStore, socket.handshake.headers.cookie);
+      const devSessionToken = getDevSessionTokenFromSocketAuth(socket.handshake.auth);
+      socket.data.authUser = devSessionToken
+        ? await getSessionUser(authStore, devSessionToken)
+        : await getSessionUserFromCookieHeader(authStore, socket.handshake.headers.cookie);
       next();
     } catch (error) {
       next(error as Error);

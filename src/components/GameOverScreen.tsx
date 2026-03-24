@@ -18,6 +18,17 @@ export default function GameOverScreen({
   const isWin = (gameState.winner === 'players' && me?.role === 'player') ||
     (gameState.winner === 'imposter' && me?.role === 'imposter');
   const imposter = gameState.players.find(player => player.role === 'imposter')!;
+  const isImposterGuessWin = gameState.gameOverReason === 'imposterGuessedWord';
+  const headline = isImposterGuessWin
+    ? 'Imposter Guessed The Word!'
+    : gameState.winner === 'players'
+      ? 'Players Win!'
+      : 'Imposter Wins!';
+  const subheadline = isImposterGuessWin
+    ? 'The imposter named the secret word during voting and stole the round.'
+    : isWin
+      ? 'Victory is yours!'
+      : 'Defeat. Try again?';
 
   return (
     <div className="max-w-3xl mx-auto py-12 px-4 text-center space-y-16">
@@ -31,13 +42,27 @@ export default function GameOverScreen({
         </div>
         <div className="space-y-2">
           <h2 className="text-7xl font-black text-white tracking-tighter uppercase">
-            {gameState.winner === 'players' ? 'Players Win!' : 'Imposter Wins!'}
+            {headline}
           </h2>
           <p className="text-3xl text-slate-400 font-bold">
-            {isWin ? 'Victory is yours!' : 'Defeat. Try again?'}
+            {subheadline}
           </p>
         </div>
       </motion.div>
+
+      {isImposterGuessWin && (
+        <div className="rounded-[3rem] border border-red-500/30 bg-[linear-gradient(135deg,rgba(127,29,29,0.4),rgba(15,23,42,0.96))] p-10 shadow-2xl shadow-red-950/20">
+          <div className="space-y-3">
+            <span className="text-xs font-black uppercase tracking-[0.3em] text-red-200">Instant Imposter Win</span>
+            <div className="text-4xl font-black uppercase tracking-tight text-white">
+              {imposter.name} guessed "{gameState.imposterWinningGuess ?? gameState.secretWord}"
+            </div>
+            <p className="text-base font-bold leading-relaxed text-red-100/90">
+              The vote ended immediately because the imposter correctly identified the secret word.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="bg-slate-900 rounded-[3rem] p-12 shadow-2xl border border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-12 relative overflow-hidden">
         <div className="space-y-3">

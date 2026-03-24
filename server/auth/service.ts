@@ -20,7 +20,7 @@ export class AuthServiceError extends Error {
   }
 }
 
-function toPublicUser(user: AuthUserRecord): AuthUser {
+export function toPublicUser(user: AuthUserRecord): AuthUser {
   return {
     id: user.id,
     username: user.username,
@@ -38,7 +38,7 @@ function isDuplicateEntryError(error: unknown) {
   );
 }
 
-async function createSession(store: AuthStore, userId: number): Promise<SessionPayload> {
+export async function issueSessionForUser(store: AuthStore, userId: number): Promise<SessionPayload> {
   const token = createSessionToken();
   const expiresAt = new Date(Date.now() + getSessionTtlMs());
 
@@ -86,7 +86,7 @@ export async function signupUser(store: AuthStore, payload: unknown): Promise<Au
 
     return {
       user: toPublicUser(user),
-      session: await createSession(store, user.id),
+      session: await issueSessionForUser(store, user.id),
     };
   } catch (error) {
     if (isDuplicateEntryError(error)) {
@@ -121,7 +121,7 @@ export async function loginUser(store: AuthStore, payload: unknown): Promise<Aut
 
   return {
     user: toPublicUser(user),
-    session: await createSession(store, user.id),
+    session: await issueSessionForUser(store, user.id),
   };
 }
 

@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import { useEffect, type RefObject } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageSquare, User } from 'lucide-react';
 import type { GameState, Player } from '../types';
@@ -31,6 +31,27 @@ export default function ChatPanel({
 }: ChatPanelProps) {
   const isPlaying = gameState.phase === 'playing';
   const isSpectator = isSpectatorPlayer(me);
+
+  useEffect(() => {
+    let frameOne = 0;
+    let frameTwo = 0;
+
+    frameOne = window.requestAnimationFrame(() => {
+      frameTwo = window.requestAnimationFrame(() => {
+        const container = chatContainerRef.current;
+        if (!container) {
+          return;
+        }
+
+        container.scrollTop = container.scrollHeight;
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameOne);
+      window.cancelAnimationFrame(frameTwo);
+    };
+  }, [chatContainerRef, gameState.messages.length, gameState.phase]);
 
   return (
     <div
@@ -69,7 +90,7 @@ export default function ChatPanel({
                       animate={{ opacity: 1, y: 0 }}
                       className="flex justify-center py-0.5"
                     >
-                      <span className="rounded-full border border-amber-500/15 bg-slate-950/80 px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">
+                      <span className="max-w-full whitespace-pre-wrap break-words rounded-full border border-amber-500/15 bg-slate-950/80 px-3 py-1 text-center text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">
                         {msg.text}
                       </span>
                     </motion.div>
@@ -90,11 +111,11 @@ export default function ChatPanel({
                       <User className="h-4 w-4" />
                     </div>
 
-                    <div className={`max-w-[85%] rounded-[1.5rem] border px-4 py-3 shadow-lg ${isMe
+                    <div className={`min-w-0 max-w-[85%] rounded-[1.5rem] border px-4 py-3 shadow-lg ${isMe
                       ? 'border-amber-400/20 bg-[linear-gradient(180deg,rgba(146,64,14,0.28),rgba(30,41,59,0.96))] text-white'
                       : 'border-slate-700/80 bg-slate-900/92 text-slate-200'
                       }`}>
-                      <div className={`mb-1.5 flex items-center gap-2 ${isMe ? 'justify-end' : ''}`}>
+                      <div className={`mb-1.5 flex min-w-0 items-center gap-2 ${isMe ? 'justify-end' : ''}`}>
                         <span className={`text-[9px] font-black uppercase tracking-[0.18em] ${isMe ? 'text-amber-200/75' : 'text-slate-500'}`}>
                           {msg.playerName}
                         </span>
@@ -102,7 +123,7 @@ export default function ChatPanel({
                           {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
-                      <div className={`text-sm font-bold leading-snug ${isWarning ? 'text-red-400' : ''}`}>
+                      <div className={`whitespace-pre-wrap break-words text-sm font-bold leading-snug ${isWarning ? 'text-red-400' : ''}`}>
                         {msg.text}
                       </div>
                     </div>
@@ -120,7 +141,7 @@ export default function ChatPanel({
                 type="text"
                 value={userHint}
                 onChange={(e) => onUserHintChange(e.target.value)}
-                onKeyPress={(e) => {
+                onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     if (isPlaying) {
                       onSubmitHint();
@@ -129,7 +150,7 @@ export default function ChatPanel({
                     }
                   }
                 }}
-                placeholder={isPlaying ? 'Enter a 1-word hint...' : 'Type a message...'}
+                placeholder={isPlaying ? 'Enter a hint...' : 'Type a message...'}
                 className="flex-1 rounded-2xl border border-slate-700 bg-slate-900/90 px-6 py-4 text-base font-bold text-white shadow-inner shadow-black/20 transition-all placeholder:text-slate-500 focus:border-amber-400/45 focus:outline-none"
               />
               <button

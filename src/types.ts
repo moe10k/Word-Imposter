@@ -39,7 +39,9 @@ export interface GameState {
   turnOrder: string[];
   round: number;
   winner: 'players' | 'imposter' | null;
+  gameOverReason: 'playersCaughtImposter' | 'imposterGuessedWord' | 'imposterOutlastedPlayers' | null;
   eliminatedPlayerId: string | null;
+  imposterWinningGuess: string | null;
   wordGeneratorId?: string;
   lastVoteResults: Record<string, string>; // voterId -> votedId
   timer: number;

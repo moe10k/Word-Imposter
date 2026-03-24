@@ -9,6 +9,9 @@ import {
   setRoomQuery,
 } from '../utils/roomSession';
 
+const DEV_SESSION_HEADER_NAME = 'x-word-imposter-dev-session';
+const DEV_SESSION_STORAGE_KEY = 'wordImposterDevSessionToken';
+
 type LoginPayload = {
   identifier: string;
   password: string;
@@ -23,15 +26,46 @@ type SignupPayload = {
 type AuthResponse = {
   user: AuthUser | null;
   error?: string;
+  devSessionToken?: string;
 };
 
-async function requestAuth(endpoint: string, options: RequestInit = {}) {
+function getStoredDevSessionToken() {
+  if (!import.meta.env.DEV) {
+    return null;
+  }
+
+  const token = window.sessionStorage.getItem(DEV_SESSION_STORAGE_KEY);
+  return token?.trim() ? token : null;
+}
+
+function storeDevSessionToken(token: string) {
+  if (!import.meta.env.DEV) {
+    return;
+  }
+
+  window.sessionStorage.setItem(DEV_SESSION_STORAGE_KEY, token);
+}
+
+function clearStoredDevSessionToken() {
+  if (!import.meta.env.DEV) {
+    return;
+  }
+
+  window.sessionStorage.removeItem(DEV_SESSION_STORAGE_KEY);
+}
+
+async function requestAuth(
+  endpoint: string,
+  options: RequestInit & { devSessionToken?: string | null } = {}
+) {
+  const { devSessionToken, ...fetchOptions } = options;
   const response = await fetch(endpoint, {
     credentials: 'same-origin',
-    ...options,
+    ...fetchOptions,
     headers: {
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-      ...(options.headers ?? {}),
+      ...(fetchOptions.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(devSessionToken ? { [DEV_SESSION_HEADER_NAME]: devSessionToken } : {}),
+      ...(fetchOptions.headers ?? {}),
     },
   });
 
@@ -46,11 +80,13 @@ async function requestAuth(endpoint: string, options: RequestInit = {}) {
 
   return {
     user: data.user ?? null,
+    devSessionToken: typeof data.devSessionToken === 'string' ? data.devSessionToken : undefined,
   } satisfies AuthResponse;
 }
 
 export function useGameClient() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [devSessionToken, setDevSessionToken] = useState<string | null>(() => getStoredDevSessionToken());
   const [authStatus, setAuthStatus] = useState<'loading' | 'ready'>('loading');
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
@@ -69,10 +105,14 @@ export function useGameClient() {
 
     const loadSession = async () => {
       try {
-        const response = await requestAuth('/api/auth/session');
+        const response = await requestAuth('/api/auth/session', { devSessionToken });
         if (isMounted) {
           setAuthUser(response.user);
           setAuthError(null);
+          if (!response.user && devSessionToken) {
+            clearStoredDevSessionToken();
+            setDevSessionToken(null);
+          }
         }
       } catch (error) {
         if (isMounted) {
@@ -90,7 +130,7 @@ export function useGameClient() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [devSessionToken]);
 
   useEffect(() => {
     if (!authUser) {
@@ -105,7 +145,9 @@ export function useGameClient() {
       return;
     }
 
-    const newSocket = io();
+    const newSocket = io({
+      auth: devSessionToken ? { devSessionToken } : undefined,
+    });
     setSocket(newSocket);
     setGameState(null);
     setIsJoined(false);
@@ -153,7 +195,7 @@ export function useGameClient() {
       newSocket.close();
       setSocket(currentSocket => (currentSocket === newSocket ? null : currentSocket));
     };
-  }, [authUser?.id]);
+  }, [authUser?.id, devSessionToken]);
 
   const login = async (payload: LoginPayload) => {
     setIsAuthSubmitting(true);
@@ -163,7 +205,10 @@ export function useGameClient() {
       const response = await requestAuth('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify(payload),
+        devSessionToken,
       });
+      clearStoredDevSessionToken();
+      setDevSessionToken(null);
       setAuthUser(response.user);
       return true;
     } catch (error) {
@@ -182,7 +227,10 @@ export function useGameClient() {
       const response = await requestAuth('/api/auth/signup', {
         method: 'POST',
         body: JSON.stringify(payload),
+        devSessionToken,
       });
+      clearStoredDevSessionToken();
+      setDevSessionToken(null);
       setAuthUser(response.user);
       return true;
     } catch (error) {
@@ -197,8 +245,10 @@ export function useGameClient() {
     setAuthError(null);
 
     try {
-      await requestAuth('/api/auth/logout', { method: 'POST' });
+      await requestAuth('/api/auth/logout', { method: 'POST', devSessionToken });
     } finally {
+      clearStoredDevSessionToken();
+      setDevSessionToken(null);
       setAuthUser(null);
       setGameState(null);
       setIsJoined(false);
@@ -206,6 +256,36 @@ export function useGameClient() {
       setInputRoomId('');
       activeRoomIdRef.current = '';
       clearRoomQuery();
+    }
+  };
+
+  const devLogin = async (slot: number) => {
+    if (!import.meta.env.DEV) {
+      return false;
+    }
+
+    setIsAuthSubmitting(true);
+    setAuthError(null);
+
+    try {
+      const response = await requestAuth('/api/dev/login-as', {
+        method: 'POST',
+        body: JSON.stringify({ slot }),
+      });
+
+      if (!response.user || !response.devSessionToken) {
+        throw new Error('Unable to start a dev session.');
+      }
+
+      storeDevSessionToken(response.devSessionToken);
+      setDevSessionToken(response.devSessionToken);
+      setAuthUser(response.user);
+      return true;
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Unable to start a dev session.');
+      return false;
+    } finally {
+      setIsAuthSubmitting(false);
     }
   };
 
@@ -284,11 +364,13 @@ export function useGameClient() {
     authUser,
     clearAuthError: () => setAuthError(null),
     createLobby,
+    devLogin,
     gameState,
     inputRoomId,
     isAuthSubmitting,
     isJoined,
     isMyTurn,
+    isDevelopment: import.meta.env.DEV,
     joinError,
     joinGame,
     kickPlayer,

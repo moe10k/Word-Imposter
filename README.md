@@ -15,7 +15,7 @@
    `npm run db:setup`
 5. Start the app:
    `npm run dev`
-6. Open [http://localhost:3000](http://localhost:3000), create an account, log in, then create or join a room.
+6. `npm run dev` opens the local game URL in 4 browser tabs on first startup. In development you can click the `Dev Player 1-4` buttons to sign each tab in instantly.
 
 ## Database Files
 

@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Users, Sword, AlertCircle, RefreshCw, LogOut } from 'lucide-react';
 import GameOverScreen from './components/GameOverScreen';
 import LobbyScreen from './components/LobbyScreen';
 import PlayingScreen from './components/PlayingScreen';
 import { useGameClient } from './hooks/useGameClient';
-import { getAlivePlayerCount, getMessageCount } from './utils/gameSelectors';
+import { getAlivePlayerCount } from './utils/gameSelectors';
 import { copyText } from './utils/clipboard';
 
 export default function App() {
@@ -15,9 +15,11 @@ export default function App() {
     authUser,
     clearAuthError,
     createLobby,
+    devLogin,
     gameState,
     inputRoomId,
     isAuthSubmitting,
+    isDevelopment,
     isJoined,
     isMyTurn,
     joinError,
@@ -49,65 +51,18 @@ export default function App() {
   const [copyCodeSuccess, setCopyCodeSuccess] = useState(false);
   const [expandedPlayerIds, setExpandedPlayerIds] = useState<string[]>([]);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const shouldAutoScrollRef = useRef(true);
-
-  const messagesLength = getMessageCount(gameState);
-
-  const scrollToBottom = useCallback((force = false) => {
-    if (!chatContainerRef.current) return;
-
-    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
-    const isNearBottom = scrollHeight - scrollTop - clientHeight < 20;
-
-    if (force || shouldAutoScrollRef.current || isNearBottom) {
-      chatContainerRef.current.scrollTo({
-        top: scrollHeight,
-        behavior: 'smooth'
-      });
-    }
-  }, []);
-
-  useEffect(() => {
-    const chatContainer = chatContainerRef.current;
-    if (!chatContainer) return;
-
-    const updateAutoScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = chatContainer;
-      shouldAutoScrollRef.current = scrollHeight - scrollTop - clientHeight < 40;
-    };
-
-    updateAutoScroll();
-    chatContainer.addEventListener('scroll', updateAutoScroll);
-
-    return () => {
-      chatContainer.removeEventListener('scroll', updateAutoScroll);
-    };
-  }, [gameState?.phase]);
-
-  useEffect(() => {
-    if (messagesLength <= 0) return;
-
-    const animationFrame = window.requestAnimationFrame(() => {
-      scrollToBottom(gameState?.phase === 'lobby');
-    });
-
-    return () => {
-      window.cancelAnimationFrame(animationFrame);
-    };
-  }, [gameState?.phase, messagesLength, scrollToBottom]);
 
   useEffect(() => {
     if (gameState?.phase === 'lobby') {
       setUserHint('');
       setImposterGuess('');
       setExpandedPlayerIds([]);
-      shouldAutoScrollRef.current = true;
     }
   }, [gameState?.phase]);
 
   const handleSubmitHint = () => {
     if (!userHint.trim()) return;
-    submitHint(userHint.trim().split(' ')[0]);
+    submitHint(userHint.trim());
     setUserHint('');
   };
 
@@ -286,6 +241,27 @@ export default function App() {
                 ? 'Need an account? Create one'
                 : 'Already have an account? Log in'}
             </button>
+
+            {isDevelopment && (
+              <div className="pt-4 border-t border-slate-800 space-y-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Quick Dev Login</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {[1, 2, 3, 4].map(slot => (
+                    <button
+                      key={slot}
+                      onClick={() => void devLogin(slot)}
+                      disabled={isAuthSubmitting}
+                      className="bg-slate-800 border border-slate-700 text-slate-200 py-3 rounded-xl text-sm font-bold hover:border-indigo-500 hover:text-white transition-all disabled:opacity-70"
+                    >
+                      Dev Player {slot}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-slate-600 text-[11px]">
+                  Each browser tab keeps its own dev session, so you can test multiple players side by side.
+                </p>
+              </div>
+            )}
           </div>
         </motion.div>
       </div>
@@ -382,7 +358,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950 font-sans text-slate-200 selection:bg-indigo-500/30 selection:text-indigo-200 overflow-x-hidden">
       <nav className="border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50 h-20">
-        <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
+        <div className="max-w-[1560px] mx-auto px-6 h-full flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="bg-indigo-600 p-2.5 rounded-xl shadow-lg shadow-indigo-600/20">
               <Sword className="w-6 h-6 text-white" />
@@ -428,7 +404,7 @@ export default function App() {
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto py-12 px-6">
+      <main className="max-w-[1560px] mx-auto py-12 px-6">
         <AnimatePresence mode="wait">
           {gameState.phase === 'lobby' && (
             <LobbyScreen

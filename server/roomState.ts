@@ -21,7 +21,9 @@ export function createGameState(roomId: string): GameState {
     turnOrder: [],
     round: 1,
     winner: null,
+    gameOverReason: null,
     eliminatedPlayerId: null,
+    imposterWinningGuess: null,
     lastVoteResults: {},
     timer: 0,
     maxTimer: 0,
@@ -69,7 +71,9 @@ export function resetRoomToLobby(room: GameState) {
   room.secretWord = '';
   room.imposterWord = '';
   room.winner = null;
+  room.gameOverReason = null;
   room.eliminatedPlayerId = null;
+  room.imposterWinningGuess = null;
   room.lastVoteResults = {};
   room.round = 1;
   room.currentTurnPlayerId = null;

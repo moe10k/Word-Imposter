@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import { Users, Sword, CheckCircle2, Copy, Link as LinkIcon, Play, Clock, LogOut } from 'lucide-react';
+import { Sword, CheckCircle2, Copy, Link as LinkIcon, Play, Clock, LogOut } from 'lucide-react';
 import type { GameState, Player } from '../types';
 import ChatPanel from './ChatPanel';
 import PlayerList from './PlayerList';
@@ -52,10 +52,6 @@ export default function LobbyScreen({
           <Sword className="w-10 h-10 text-white" />
         </div>
         <h2 className="text-4xl font-black text-white tracking-tighter uppercase font-display">Lobby</h2>
-        <div className="flex items-center justify-center gap-2 text-slate-500 font-bold text-sm tracking-widest uppercase">
-          <Users className="w-4 h-4" />
-          {gameState.players.length} Players Waiting
-        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,2.35fr)_minmax(360px,1fr)] lg:items-start">
@@ -141,6 +137,9 @@ export default function LobbyScreen({
           <div className="bg-slate-900 rounded-[2rem] p-8 shadow-2xl border border-slate-800 space-y-6">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em]">Player List</h3>
+              <span className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">
+                {gameState.players.length} Players Waiting
+              </span>
             </div>
             <PlayerList
               gameState={gameState}

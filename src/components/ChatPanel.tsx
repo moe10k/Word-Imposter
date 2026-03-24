@@ -61,14 +61,11 @@ export default function ChatPanel({
       <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/45 to-transparent" />
 
       <div className="flex h-full flex-col">
-        <div className="mb-6 flex items-center justify-between gap-4 border-b border-amber-500/12 pb-5">
+        <div className="mb-6 border-b border-amber-500/12 pb-5">
           <h3 className="flex items-center gap-3 text-xs font-black uppercase tracking-[0.28em] text-amber-200/75">
             <MessageSquare className="h-4 w-4 text-amber-400" />
             {isPlaying ? 'Game Log & Hints' : 'Lobby Chat'}
           </h3>
-          <div className="rounded-full border border-amber-500/20 bg-slate-950/70 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
-            {gameState.messages.length} Entries
-          </div>
         </div>
 
         <div

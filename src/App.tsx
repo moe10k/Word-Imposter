@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Users, Sword, AlertCircle, RefreshCw, LogOut } from 'lucide-react';
+import { Sword, AlertCircle, RefreshCw } from 'lucide-react';
 import GameOverScreen from './components/GameOverScreen';
 import LobbyScreen from './components/LobbyScreen';
+import Navbar from './components/Navbar';
 import PlayingScreen from './components/PlayingScreen';
 import { useGameClient } from './hooks/useGameClient';
-import { getAlivePlayerCount } from './utils/gameSelectors';
 import { copyText } from './utils/clipboard';
 
 export default function App() {
@@ -270,79 +270,85 @@ export default function App() {
 
   if (!isJoined) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 font-sans">
-        <motion.div
-          initial={{ scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="bg-slate-900 p-12 rounded-[3rem] shadow-2xl shadow-black/50 max-w-md w-full text-center space-y-8 border border-slate-800"
-        >
-          <div className="bg-indigo-600 p-6 rounded-3xl inline-block shadow-xl shadow-indigo-500/20">
-            <Sword className="w-12 h-12 text-white" />
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-4xl font-black tracking-tighter text-white uppercase font-display">WORD IMPOSTER</h1>
-            <p className="text-slate-500 font-medium text-sm">Signed in as {authUser.username}</p>
-          </div>
-          <div className="space-y-4">
-            {joinError && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-2xl text-xs font-bold flex items-center gap-2"
-              >
-                <AlertCircle className="w-4 h-4" />
-                {joinError}
-              </motion.div>
-            )}
+      <div className="min-h-screen bg-slate-950 font-sans text-slate-200 selection:bg-indigo-500/30 selection:text-indigo-200 overflow-x-hidden">
+        <Navbar
+          authUser={authUser}
+          phase="lobby"
+          onLogout={logout}
+          onResetGame={resetGame}
+        />
 
-            <div className="bg-slate-800/60 border border-slate-700 rounded-2xl px-5 py-4 text-left">
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Account</p>
-              <p className="text-white font-bold text-lg">{authUser.username}</p>
-              <p className="text-slate-500 text-sm">{authUser.email}</p>
+        <main className="max-w-[1560px] mx-auto min-h-[calc(100vh-10rem)] flex items-center justify-center px-6 py-12">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-slate-900 p-12 rounded-[3rem] shadow-2xl shadow-black/50 max-w-md w-full text-center space-y-8 border border-slate-800"
+          >
+            <div className="bg-indigo-600 p-6 rounded-3xl inline-block shadow-xl shadow-indigo-500/20">
+              <Sword className="w-12 h-12 text-white" />
             </div>
-
-            <div className="h-px w-full bg-slate-800 my-4" />
-
-            <div className="flex flex-col gap-3">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={inputRoomId}
-                  onChange={(e) => setInputRoomId(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && joinGame()}
-                  placeholder="Room Code"
-                  className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 font-bold text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-600 transition-all text-center shadow-inner uppercase"
-                />
-                <button
-                  onClick={joinGame}
-                  className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-900/20 whitespace-nowrap"
+            <div className="space-y-2">
+              <h1 className="text-4xl font-black tracking-tighter text-white uppercase font-display">WORD IMPOSTER</h1>
+              <p className="text-slate-500 font-medium text-sm">Signed in as {authUser.username}</p>
+            </div>
+            <div className="space-y-4">
+              {joinError && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-2xl text-xs font-bold flex items-center gap-2"
                 >
-                  Join
+                  <AlertCircle className="w-4 h-4" />
+                  {joinError}
+                </motion.div>
+              )}
+
+              <div className="bg-slate-800/60 border border-slate-700 rounded-2xl px-5 py-4 text-left">
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Account</p>
+                <p className="text-white font-bold text-lg">{authUser.username}</p>
+                <p className="text-slate-500 text-sm">{authUser.email}</p>
+              </div>
+
+              <div className="h-px w-full bg-slate-800 my-4" />
+
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={inputRoomId}
+                    onChange={(e) => setInputRoomId(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && joinGame()}
+                    placeholder="Room Code"
+                    className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 font-bold text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-600 transition-all text-center shadow-inner uppercase"
+                  />
+                  <button
+                    onClick={joinGame}
+                    className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-900/20 whitespace-nowrap"
+                  >
+                    Join
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-4 my-2">
+                  <div className="flex-1 h-px bg-slate-800" />
+                  <span className="text-xs font-black text-slate-600 uppercase tracking-widest">OR</span>
+                  <div className="flex-1 h-px bg-slate-800" />
+                </div>
+
+                <button
+                  onClick={createLobby}
+                  className="w-full bg-slate-800 border-2 border-slate-700 text-white py-4 rounded-xl font-bold text-lg hover:border-indigo-500 hover:bg-slate-800/80 transition-all shadow-lg"
+                >
+                  Create New Lobby
                 </button>
               </div>
-
-              <div className="flex items-center gap-4 my-2">
-                <div className="flex-1 h-px bg-slate-800" />
-                <span className="text-xs font-black text-slate-600 uppercase tracking-widest">OR</span>
-                <div className="flex-1 h-px bg-slate-800" />
-              </div>
-
-              <button
-                onClick={createLobby}
-                className="w-full bg-slate-800 border-2 border-slate-700 text-white py-4 rounded-xl font-bold text-lg hover:border-indigo-500 hover:bg-slate-800/80 transition-all shadow-lg"
-              >
-                Create New Lobby
-              </button>
-
-              <button
-                onClick={logout}
-                className="w-full bg-transparent border border-slate-700 text-slate-300 py-4 rounded-xl font-bold text-sm uppercase tracking-[0.2em] hover:border-slate-500 hover:text-white transition-all"
-              >
-                Log Out
-              </button>
             </div>
-          </div>
-        </motion.div>
+          </motion.div>
+        </main>
+
+        <footer className="py-12 text-center text-slate-700 text-[10px] font-black uppercase tracking-[0.4em]">
+          <p>&copy;  Shmini's Games &bull; Word Imposter</p>
+        </footer>
       </div>
     );
   }
@@ -357,52 +363,13 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 font-sans text-slate-200 selection:bg-indigo-500/30 selection:text-indigo-200 overflow-x-hidden">
-      <nav className="border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50 h-20">
-        <div className="max-w-[1560px] mx-auto px-6 h-full flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-indigo-600 p-2.5 rounded-xl shadow-lg shadow-indigo-600/20">
-              <Sword className="w-6 h-6 text-white" />
-            </div>
-            <span className="font-black text-2xl tracking-tighter uppercase text-white">Word Imposter</span>
-          </div>
-          {isJoined && authUser && (
-            <div className="flex items-center gap-6">
-              <div className="hidden md:flex items-center gap-2 text-slate-500 font-black text-[10px] uppercase tracking-widest">
-                {authUser.username}
-              </div>
-              {gameState.phase !== 'lobby' && (
-                <div className="hidden sm:flex items-center gap-2 text-slate-500 font-black text-[10px] uppercase tracking-widest">
-                  <Users className="w-4 h-4" />
-                  {getAlivePlayerCount(gameState)} Alive
-                </div>
-              )}
-              {gameState.phase !== 'lobby' && (
-                <div className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border ${me?.role === 'imposter' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
-                  me?.role === 'spectator' ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-indigo-600 text-white border-indigo-500/20'
-                  }`}>
-                  {me?.isEliminated ? 'Eliminated' : me?.role}
-                </div>
-              )}
-              {me?.isHost && gameState.phase !== 'lobby' && (
-                <button
-                  onClick={resetGame}
-                  className="bg-slate-900 hover:bg-slate-800 text-slate-400 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-slate-800 flex items-center gap-2"
-                >
-                  <RefreshCw className="w-3 h-3" />
-                  Reset to Lobby
-                </button>
-              )}
-              <button
-                onClick={logout}
-                className="bg-slate-900 hover:bg-slate-800 text-slate-400 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-slate-800 flex items-center gap-2"
-              >
-                <LogOut className="w-3 h-3" />
-                Logout
-              </button>
-            </div>
-          )}
-        </div>
-      </nav>
+      <Navbar
+        authUser={authUser}
+        phase={gameState.phase}
+        me={me}
+        onLogout={logout}
+        onResetGame={resetGame}
+      />
 
       <main className="max-w-[1560px] mx-auto py-12 px-6">
         <AnimatePresence mode="wait">

@@ -46,6 +46,20 @@ export default function PlayingScreen({
   const currentPlayer = getCurrentTurnPlayer(gameState);
   const isSpectator = isSpectatorPlayer(me);
   const isVoting = gameState.phase === 'voting';
+  const roleText = me?.isEliminated
+    ? 'Eliminated'
+    : me?.role === 'imposter'
+      ? 'Imposter'
+      : me?.role === 'spectator'
+        ? 'Spectator'
+        : 'Player';
+  const roleTextColor = me?.isEliminated
+    ? 'text-slate-400'
+    : me?.role === 'imposter'
+      ? 'text-red-400'
+      : me?.role === 'spectator'
+        ? 'text-slate-400'
+        : 'text-indigo-300';
 
   return (
     <div className="max-w-[1560px] mx-auto space-y-12 py-8 px-4 relative">
@@ -70,9 +84,10 @@ export default function PlayingScreen({
           <div className="text-3xl font-black text-indigo-400 tracking-tight">
             {isSpectator ? 'SPECTATING' : (me?.role === 'imposter' ? gameState.imposterWord : gameState.secretWord)}
           </div>
-          {me?.role === 'imposter' && !isSpectator && (
-            <span className="text-[9px] font-black text-red-500 uppercase tracking-widest block mt-1">You are the Imposter</span>
-          )}
+          <div className="mt-1 flex items-center gap-2 text-[9px] font-black uppercase tracking-widest">
+            <span className="text-slate-500">Role</span>
+            <span className={roleTextColor}>{roleText}</span>
+          </div>
         </div>
       </div>
 
